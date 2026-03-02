@@ -1,0 +1,32 @@
+{
+  "name": "shopwise-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive test suite for Shopwise SaaS platform",
+  "scripts": {
+    "test": "npm run test:api && npm run test:e2e",
+    "test:api": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --forceExit --detectOpenHandles",
+    "test:api:watch": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --watch --forceExit --detectOpenHandles",
+    "test:api:verbose": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --verbose --forceExit --detectOpenHandles",
+    "test:api:coverage": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --coverage --forceExit --detectOpenHandles",
+    "test:api:auth": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --testPathPattern=auth --forceExit",
+    "test:api:admin": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --testPathPattern=admin --forceExit",
+    "test:api:customer": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --testPathPattern=customer --forceExit",
+    "test:api:public": "cd ../backend && npx jest --config ../tests/backend/jest.config.js --testPathPattern=public --forceExit",
+    "test:e2e": "npx cypress run --config-file cypress/cypress.config.js",
+    "test:e2e:open": "npx cypress open --config-file cypress/cypress.config.js",
+    "test:e2e:admin": "npx cypress run --config-file cypress/cypress.config.js --spec 'cypress/e2e/admin/**'",
+    "test:e2e:customer": "npx cypress run --config-file cypress/cypress.config.js --spec 'cypress/e2e/customer/**'",
+    "test:e2e:marketing": "npx cypress run --config-file cypress/cypress.config.js --spec 'cypress/e2e/marketing/**'",
+    "test:e2e:flows": "npx cypress run --config-file cypress/cypress.config.js --spec 'cypress/e2e/flows/**'",
+    "test:e2e:a11y": "npx cypress run --config-file cypress/cypress.config.js --spec 'cypress/e2e/accessibility/**'",
+    "install:deps": "npm install && cd ../backend && npm install --save-dev jest supertest mongodb-memory-server @types/jest",
+    "setup": "npm run install:deps"
+  },
+  "dependencies": {
+    "cypress": "^13.17.0",
+    "cypress-axe": "^1.5.0",
+    "axe-core": "^4.10.0",
+    "start-server-and-test": "^2.0.8"
+  },
+  "devDependencies": {}
+}

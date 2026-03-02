@@ -1,0 +1,32 @@
+{
+  "plan": {
+    "name": "Test Pro Plan",
+    "description": "Test plan for E2E testing",
+    "monthlyPrice": 19.99,
+    "yearlyPrice": 199.99
+  },
+  "feature": {
+    "name": "Listing Audit",
+    "featureKey": "listing_audit",
+    "type": "numeric",
+    "description": "AI-powered listing analysis"
+  },
+  "blogPost": {
+    "title": "Test Blog Post for E2E",
+    "excerpt": "This is a test excerpt",
+    "content": "<p>Full test content for the blog post with sufficient words.</p>",
+    "category": "General",
+    "tags": ["test", "e2e"]
+  },
+  "marketingPage": {
+    "title": "Test Landing Page",
+    "description": "Test page for E2E testing"
+  },
+  "listing": {
+    "title": "Handmade Ceramic Mug - Artisan Coffee Cup",
+    "description": "Beautiful handmade ceramic mug perfect for your morning coffee. Each piece is uniquely crafted with care.",
+    "tags": ["ceramic", "mug", "handmade", "coffee"],
+    "price": 24.99,
+    "category": "Home & Living"
+  }
+}

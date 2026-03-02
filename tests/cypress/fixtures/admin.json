@@ -1,0 +1,12 @@
+{
+  "admin": {
+    "email": "superadmin@test.com",
+    "password": "Admin@123456",
+    "name": "Super Admin"
+  },
+  "moderator": {
+    "email": "moderator@test.com",
+    "password": "Moderator@123456",
+    "name": "Test Moderator"
+  }
+}

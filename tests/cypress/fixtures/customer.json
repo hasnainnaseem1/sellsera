@@ -1,0 +1,12 @@
+{
+  "customer": {
+    "email": "testcustomer@test.com",
+    "password": "Customer@123456",
+    "name": "Test Customer"
+  },
+  "newCustomer": {
+    "email": "newcustomer@test.com",
+    "password": "NewCustomer@123456",
+    "name": "New Customer"
+  }
+}

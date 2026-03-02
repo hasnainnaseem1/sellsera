@@ -1,0 +1,7 @@
+node_modules/
+backend/node_modules/
+.cache/
+backup_*/
+*.exe
+.env
+adminsettings.json
