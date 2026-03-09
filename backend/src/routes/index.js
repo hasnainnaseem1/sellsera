@@ -11,7 +11,13 @@ router.get('/health', (req, res) => {
     success: true,
     message: 'Server is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    env: {
+      NODE_ENV: process.env.NODE_ENV || 'not set',
+      JWT_SECRET: process.env.JWT_SECRET ? 'configured' : 'MISSING',
+      MONGODB_URI: process.env.MONGODB_URI ? 'configured' : 'MISSING',
+      BACKEND_URL: process.env.BACKEND_URL || 'not set',
+    }
   });
 });
 
