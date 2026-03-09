@@ -11,6 +11,9 @@ const { getSecuritySettings, msToJwtExpiry, validatePassword } = require('../../
 
 // Generate JWT token with dynamic session timeout
 const generateToken = (userId, sessionTimeoutMs) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured in environment variables');
+  }
   const expiresIn = sessionTimeoutMs ? msToJwtExpiry(sessionTimeoutMs) : '7d';
   return jwt.sign(
     { userId }, 
@@ -44,20 +47,24 @@ router.post('/login', async (req, res) => {
     }).populate('customRole', 'name permissions');
     
     if (!user) {
-      // Log failed login attempt
-      await ActivityLog.logActivity({
-        userId: null,
-        userName: 'Unknown',
-        userEmail: email,
-        userRole: 'unknown',
-        action: 'login',
-        actionType: 'auth',
-        description: 'Failed login attempt - user not found',
-        ipAddress: clientIP,
-        userAgent: req.get('user-agent'),
-        status: 'failed',
-        errorMessage: 'User not found or not an admin'
-      });
+      // Log failed login attempt (non-critical)
+      try {
+        await ActivityLog.logActivity({
+          userId: null,
+          userName: 'Unknown',
+          userEmail: email,
+          userRole: 'unknown',
+          action: 'login',
+          actionType: 'auth',
+          description: 'Failed login attempt - user not found',
+          ipAddress: clientIP,
+          userAgent: req.get('user-agent'),
+          status: 'failed',
+          errorMessage: 'User not found or not an admin'
+        });
+      } catch (logErr) {
+        console.error('Failed to log activity:', logErr.message);
+      }
       
       return res.status(401).json({
         success: false,
@@ -65,8 +72,14 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Fetch dynamic security settings
-    const secSettings = await getSecuritySettings();
+    // Fetch dynamic security settings (use defaults if fails)
+    let secSettings;
+    try {
+      secSettings = await getSecuritySettings();
+    } catch (secErr) {
+      console.error('Failed to get security settings:', secErr.message);
+      secSettings = { maxLoginAttempts: 5, lockoutDuration: 1800000, sessionTimeout: 604800000 };
+    }
 
     // Check if account is locked
     if (user.isLocked()) {
@@ -80,27 +93,35 @@ router.post('/login', async (req, res) => {
     const isMatch = await user.comparePassword(password);
     
     if (!isMatch) {
-      // Increment login attempts with dynamic settings
-      await user.incLoginAttempts(secSettings.maxLoginAttempts, secSettings.lockoutDuration);
+      // Increment login attempts (non-critical)
+      try {
+        await user.incLoginAttempts(secSettings.maxLoginAttempts, secSettings.lockoutDuration);
+      } catch (incErr) {
+        console.error('Failed to increment login attempts:', incErr.message);
+      }
       
-      // Log failed login
-      const roleLabel = user.role === 'super_admin' ? 'Super Admin' : 
-                        user.role === 'custom' ? 'Custom Role' :
-                        user.role.charAt(0).toUpperCase() + user.role.slice(1);
-      
-      await ActivityLog.logActivity({
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        userRole: user.role,
-        action: 'login',
-        actionType: 'auth',
-        description: `Failed ${roleLabel} login attempt - incorrect password`,
-        ipAddress: clientIP,
-        userAgent: req.get('user-agent'),
-        status: 'failed',
-        errorMessage: 'Incorrect password'
-      });
+      // Log failed login (non-critical)
+      try {
+        const roleLabel = user.role === 'super_admin' ? 'Super Admin' : 
+                          user.role === 'custom' ? 'Custom Role' :
+                          user.role.charAt(0).toUpperCase() + user.role.slice(1);
+        
+        await ActivityLog.logActivity({
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'login',
+          actionType: 'auth',
+          description: `Failed ${roleLabel} login attempt - incorrect password`,
+          ipAddress: clientIP,
+          userAgent: req.get('user-agent'),
+          status: 'failed',
+          errorMessage: 'Incorrect password'
+        });
+      } catch (logErr) {
+        console.error('Failed to log activity:', logErr.message);
+      }
       
       return res.status(401).json({
         success: false,
@@ -130,37 +151,55 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Reset login attempts on successful login
-    await user.resetLoginAttempts();
+    // Reset login attempts on successful login (non-critical)
+    try {
+      await user.resetLoginAttempts();
+    } catch (resetErr) {
+      console.error('Failed to reset login attempts:', resetErr.message);
+    }
 
-    // Update last login
-    user.lastLogin = new Date();
-    user.lastLoginIP = clientIP;
-    await user.save();
+    // Update last login using updateOne to avoid save hooks/version conflicts (non-critical)
+    try {
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { lastLogin: new Date(), lastLoginIP: clientIP } }
+      );
+    } catch (updateErr) {
+      console.error('Failed to update lastLogin:', updateErr.message);
+    }
 
-    // Log successful login
-    const roleLabel = user.role === 'super_admin' ? 'Super Admin' : 
-                      user.role === 'custom' ? 'Custom Role' :
-                      user.role.charAt(0).toUpperCase() + user.role.slice(1);
-    
-    await ActivityLog.logActivity({
-      userId: user._id,
-      userName: user.name,
-      userEmail: user.email,
-      userRole: user.role,
-      action: 'login',
-      actionType: 'auth',
-      description: `Successful ${roleLabel} login`,
-      ipAddress: clientIP,
-      userAgent: req.get('user-agent'),
-      status: 'success'
-    });
+    // Log successful login (non-critical)
+    try {
+      const roleLabel = user.role === 'super_admin' ? 'Super Admin' : 
+                        user.role === 'custom' ? 'Custom Role' :
+                        user.role.charAt(0).toUpperCase() + user.role.slice(1);
+      
+      await ActivityLog.logActivity({
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'login',
+        actionType: 'auth',
+        description: `Successful ${roleLabel} login`,
+        ipAddress: clientIP,
+        userAgent: req.get('user-agent'),
+        status: 'success'
+      });
+    } catch (logErr) {
+      console.error('Failed to log login activity:', logErr.message);
+    }
 
-    // Generate token with dynamic session timeout
+    // Generate token with dynamic session timeout (CRITICAL)
     const token = generateToken(user._id, secSettings.sessionTimeout);
 
     // Get permissions
-    const permissions = await user.getPermissions();
+    let permissions = [];
+    try {
+      permissions = await user.getPermissions();
+    } catch (permErr) {
+      console.error('Failed to get permissions:', permErr.message);
+    }
 
     res.json({
       success: true,
@@ -185,7 +224,7 @@ router.post('/login', async (req, res) => {
     console.error('Admin login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error logging in'
+      message: error.message || 'Error logging in'
     });
   }
 });
