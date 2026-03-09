@@ -109,43 +109,86 @@ function prompt(question, hidden = false) {
     const superAdmin = await User.findOne({ role: 'super_admin' });
 
     if (superAdmin) {
-      // ── Update existing super admin — use direct update to avoid version conflicts ──
+      // ── Update existing super admin ──
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       const finalName = newName || superAdmin.name;
 
-      const result = await User.collection.updateOne(
+      console.log(`  Found super admin: ${superAdmin.email} (${superAdmin._id})`);
+      console.log('  Updating credentials...');
+
+      // Use Mongoose updateOne (not native driver) for reliability
+      const result = await User.updateOne(
         { _id: superAdmin._id },
         {
           $set: {
             email:           newEmail,
             password:        hashedPassword,
+            name:            finalName,
             status:          'active',
             isEmailVerified: true,
             accountType:     'admin',
+            loginAttempts:   0,
             updatedAt:       new Date(),
-            ...(newName && { name: newName }),
           },
-          $unset: { lockUntil: '', loginAttempts: '' }
+          $unset: { lockUntil: 1 }
         }
       );
 
-      if (result.modifiedCount === 0) {
-        console.error('❌ Update failed — no document was modified!');
+      console.log(`  Update result: matched=${result.matchedCount}, modified=${result.modifiedCount}`);
+
+      if (result.matchedCount === 0) {
+        console.error('❌ No document matched! Trying alternative approach...');
+        
+        // Fallback: use native driver with string _id comparison
+        const nativeResult = await User.collection.updateOne(
+          { role: 'super_admin' },
+          {
+            $set: {
+              email:           newEmail,
+              password:        hashedPassword,
+              name:            finalName,
+              status:          'active',
+              isEmailVerified: true,
+              accountType:     'admin',
+              loginAttempts:   0,
+              updatedAt:       new Date(),
+            }
+          }
+        );
+
+        console.log(`  Native result: matched=${nativeResult.matchedCount}, modified=${nativeResult.modifiedCount}`);
+
+        if (nativeResult.matchedCount === 0) {
+          console.error('❌ Still no match. Listing all users with role info:');
+          const allUsers = await User.collection.find({}, { projection: { email: 1, role: 1, accountType: 1, status: 1 } }).toArray();
+          allUsers.forEach(u => console.log(`   - ${u.email} | role: ${u.role} | type: ${u.accountType} | status: ${u.status}`));
+          process.exit(1);
+        }
+      }
+
+      // Verify by reading back
+      const verified = await User.findOne({ email: newEmail, accountType: 'admin' });
+      
+      if (!verified) {
+        console.error('❌ Could not read back the updated user!');
+        // Debug: list all users
+        const allUsers = await User.collection.find({}, { projection: { email: 1, role: 1, accountType: 1 } }).toArray();
+        console.log('  All users in database:');
+        allUsers.forEach(u => console.log(`   - ${u.email} | role: ${u.role} | type: ${u.accountType}`));
         process.exit(1);
       }
 
-      // Verify the password works by reading it back
-      const verified = await User.collection.findOne({ _id: superAdmin._id });
       const passwordValid = await bcrypt.compare(newPassword, verified.password);
 
+      console.log('');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('✅ Super Admin credentials updated!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`   Name     : ${finalName}`);
-      console.log(`   Email    : ${newEmail}`);
+      console.log(`   ID       : ${verified._id}`);
+      console.log(`   Name     : ${verified.name}`);
+      console.log(`   Email    : ${verified.email}`);
       console.log(`   Password : ${newPassword}`);
       console.log(`   Status   : ${verified.status}`);
-      console.log(`   Verified : ${verified.isEmailVerified}`);
       console.log(`   AccType  : ${verified.accountType}`);
       console.log(`   Role     : ${verified.role}`);
       console.log(`   Pwd check: ${passwordValid ? '✅ PASS' : '❌ FAIL'}`);
@@ -153,9 +196,8 @@ function prompt(question, hidden = false) {
 
       if (!passwordValid) {
         console.error('');
-        console.error('⚠️  Password verification failed! The password you see above');
-        console.error('   may have been corrupted by the shell. Try running with quotes:');
-        console.error("   NEW_ADMIN_PASSWORD='YourPass@123' node src/scripts/seed/resetSuperAdmin.js");
+        console.error('⚠️  Password verification FAILED!');
+        console.error("   Try: NEW_ADMIN_PASSWORD='YourPass@123' node src/scripts/seed/resetSuperAdmin.js");
       }
     } else {
       // ── No super admin found — create one ───────────────────────────────
