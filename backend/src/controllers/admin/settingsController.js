@@ -2,6 +2,7 @@ const { ActivityLog, AdminSettings } = require('../../models/admin');
 const { bustMaintenanceCache } = require('../../middleware/security/maintenanceMode');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const emailService = require('../../services/email/emailService');
+const { resolveFromReq, toRelativeUploadPath } = require('../../utils/helpers/urlHelper');
 
 // GET /api/admin/settings
 const getSettings = async (req, res) => {
@@ -26,10 +27,10 @@ const getSettings = async (req, res) => {
       }
     }
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       settings: sanitizedSettings
-    });
+    }, req));
 
   } catch (error) {
     console.error('Get settings error:', error);
@@ -512,10 +513,10 @@ const getThemeSettings = async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       themeSettings: settings.themeSettings
-    });
+    }, req));
 
   } catch (error) {
     console.error('Get theme settings error:', error);
@@ -556,9 +557,9 @@ const updateThemeSettings = async (req, res) => {
     if (appName !== undefined) settings.themeSettings.appName = appName;
     if (appTagline !== undefined) settings.themeSettings.appTagline = appTagline;
     if (appDescription !== undefined) settings.themeSettings.appDescription = appDescription;
-    if (logoUrl !== undefined) settings.themeSettings.logoUrl = logoUrl;
-    if (logoSmallUrl !== undefined) settings.themeSettings.logoSmallUrl = logoSmallUrl;
-    if (faviconUrl !== undefined) settings.themeSettings.faviconUrl = faviconUrl;
+    if (logoUrl !== undefined) settings.themeSettings.logoUrl = toRelativeUploadPath(logoUrl);
+    if (logoSmallUrl !== undefined) settings.themeSettings.logoSmallUrl = toRelativeUploadPath(logoSmallUrl);
+    if (faviconUrl !== undefined) settings.themeSettings.faviconUrl = toRelativeUploadPath(faviconUrl);
     if (primaryService !== undefined) settings.themeSettings.primaryService = primaryService;
     if (secondaryService !== undefined) settings.themeSettings.secondaryService = secondaryService;
     if (targetPlatform !== undefined) settings.themeSettings.targetPlatform = targetPlatform;
@@ -587,11 +588,11 @@ const updateThemeSettings = async (req, res) => {
       status: 'success'
     });
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       message: 'Theme settings updated successfully',
       themeSettings: settings.themeSettings
-    });
+    }, req));
 
   } catch (error) {
     console.error('Update theme settings error:', error);

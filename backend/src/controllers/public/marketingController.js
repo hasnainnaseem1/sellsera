@@ -1,5 +1,6 @@
 const MarketingPage = require('../../models/admin/MarketingPage');
 const { AdminSettings } = require('../../models/admin');
+const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 
 /**
  * GET /api/v1/public/site
@@ -8,7 +9,7 @@ const { AdminSettings } = require('../../models/admin');
 const getSiteSettings = async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       site: {
         // General fields are top-level in AdminSettings
@@ -42,7 +43,7 @@ const getSiteSettings = async (req, res) => {
           message: settings.maintenanceMode?.message || 'We are currently performing maintenance. Please check back soon.',
         },
       },
-    });
+    }, req));
   } catch (err) {
     console.error('Error fetching site settings:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch site settings' });
@@ -110,13 +111,13 @@ const getPageBySlug = async (req, res) => {
     // Filter out hidden blocks
     const visibleBlocks = page.blocks.filter(b => b.visible !== false);
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       page: {
         ...page.toObject(),
         blocks: visibleBlocks,
       },
-    });
+    }, req));
   } catch (err) {
     console.error('Error fetching page:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch page' });
@@ -140,13 +141,13 @@ const getHomePage = async (req, res) => {
 
     const visibleBlocks = page.blocks.filter(b => b.visible !== false);
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       page: {
         ...page.toObject(),
         blocks: visibleBlocks,
       },
-    });
+    }, req));
   } catch (err) {
     console.error('Error fetching homepage:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch homepage' });

@@ -13,6 +13,7 @@ const Plan = require('../../models/subscription/Plan');
 const User = require('../../models/user/User');
 const emailService = require('../../services/email/emailService');
 const { notifySubscriptionChange } = require('../../services/notification/adminNotifier');
+const { getBaseUrlFromEnv } = require('../../utils/helpers/urlHelper');
 
 /**
  * Helper: get the active payment gateway from AdminSettings
@@ -480,7 +481,7 @@ const downloadInvoice = async (req, res) => {
 const generateSignedInvoiceUrl = (paymentId, userId) => {
   const secret = process.env.JWT_SECRET;
   const token = jwt.sign({ paymentId: paymentId.toString(), userId: userId.toString(), type: 'invoice' }, secret, { expiresIn: '30d' });
-  const base = process.env.BACKEND_URL || process.env.API_URL || 'http://localhost:3001';
+  const base = getBaseUrlFromEnv();
   return `${base}/api/v1/public/invoice/${paymentId}?token=${token}`;
 };
 

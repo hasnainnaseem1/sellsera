@@ -1,6 +1,7 @@
 ﻿const nodemailer = require('nodemailer');
 const { AdminSettings } = require('../../models/admin');
 const { defaults: defaultTemplates } = require('./defaultTemplates');
+const { resolveFromEnv } = require('../../utils/helpers/urlHelper');
 
 class EmailService {
   constructor() {
@@ -85,7 +86,7 @@ class EmailService {
       userName: user.name || 'there',
       userEmail: user.email || '',
       siteName,
-      logoUrl: (settings.themeSettings && settings.themeSettings.logoUrl) || '',
+      logoUrl: resolveFromEnv((settings.themeSettings && settings.themeSettings.logoUrl) || ''),
       primaryColor: (settings.themeSettings && settings.themeSettings.primaryColor) || '#7C3AED',
       secondaryColor: (settings.themeSettings && settings.themeSettings.secondaryColor) || '#3B82F6',
       supportEmail: settings.supportEmail || '',

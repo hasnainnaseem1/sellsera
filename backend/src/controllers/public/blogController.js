@@ -1,4 +1,5 @@
 const BlogPost = require('../../models/admin/BlogPost');
+const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 
 /**
  * GET /api/v1/public/blog/posts
@@ -49,7 +50,7 @@ const getPosts = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       posts,
       pagination: {
@@ -57,7 +58,7 @@ const getPosts = async (req, res) => {
         page: parseInt(page),
         pages: Math.ceil(total / limit),
       },
-    });
+    }, req));
   } catch (err) {
     console.error('Error fetching public blog posts:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch blog posts' });
@@ -75,7 +76,7 @@ const getPopularPosts = async (req, res) => {
       .sort({ views: -1 })
       .limit(5);
 
-    res.json({ success: true, posts });
+    res.json(resolveFromReq({ success: true, posts }, req));
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch popular posts' });
   }
@@ -128,7 +129,7 @@ const getPostBySlug = async (req, res) => {
       .sort({ publishedAt: -1 })
       .limit(3);
 
-    res.json({ success: true, post, related });
+    res.json(resolveFromReq({ success: true, post, related }, req));
   } catch (err) {
     console.error('Error fetching blog post:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch post' });

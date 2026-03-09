@@ -1,4 +1,5 @@
 const { AdminSettings, SeoRedirect } = require('../../models/admin');
+const { resolveFromReq, toRelativeUploadPath, stripUploadHosts } = require('../../utils/helpers/urlHelper');
 
 /**
  * GET /api/v1/admin/seo/settings
@@ -7,7 +8,7 @@ const { AdminSettings, SeoRedirect } = require('../../models/admin');
 const getSettings = async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
-    res.json({ success: true, seoSettings: settings.seoSettings || {} });
+    res.json(resolveFromReq({ success: true, seoSettings: settings.seoSettings || {} }, req));
   } catch (err) {
     console.error('Error fetching SEO settings:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch SEO settings' });
@@ -41,10 +42,10 @@ const updateSettings = async (req, res) => {
     if (googleAnalyticsId !== undefined) settings.seoSettings.googleAnalyticsId = googleAnalyticsId;
     if (googleSearchConsoleVerification !== undefined) settings.seoSettings.googleSearchConsoleVerification = googleSearchConsoleVerification;
     if (bingVerification !== undefined) settings.seoSettings.bingVerification = bingVerification;
-    if (defaultOgImage !== undefined) settings.seoSettings.defaultOgImage = defaultOgImage;
+    if (defaultOgImage !== undefined) settings.seoSettings.defaultOgImage = toRelativeUploadPath(defaultOgImage);
     if (socialLinks !== undefined) settings.seoSettings.socialLinks = socialLinks;
     if (socialLinksEnabled !== undefined) settings.seoSettings.socialLinksEnabled = socialLinksEnabled;
-    if (customSocialLinks !== undefined) settings.seoSettings.customSocialLinks = customSocialLinks;
+    if (customSocialLinks !== undefined) settings.seoSettings.customSocialLinks = stripUploadHosts(customSocialLinks);
     if (enableSitemap !== undefined) settings.seoSettings.enableSitemap = enableSitemap;
     if (robotsTxtCustom !== undefined) settings.seoSettings.robotsTxtCustom = robotsTxtCustom;
     if (customHeadScripts !== undefined) settings.seoSettings.customHeadScripts = customHeadScripts;
@@ -53,7 +54,7 @@ const updateSettings = async (req, res) => {
     settings.markModified('seoSettings');
     await settings.save();
 
-    res.json({ success: true, seoSettings: settings.seoSettings });
+    res.json(resolveFromReq({ success: true, seoSettings: settings.seoSettings }, req));
   } catch (err) {
     console.error('Error updating SEO settings:', err);
     res.status(500).json({ success: false, message: 'Failed to update SEO settings' });

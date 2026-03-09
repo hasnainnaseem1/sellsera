@@ -1,6 +1,7 @@
 const MarketingPage = require('../../models/admin/MarketingPage');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { stripUploadHosts, resolveFromReq } = require('../../utils/helpers/urlHelper');
 
 /**
  * GET /api/v1/admin/marketing/pages
@@ -36,7 +37,7 @@ const getPage = async (req, res) => {
     if (!page) {
       return res.status(404).json({ success: false, message: 'Page not found' });
     }
-    res.json({ success: true, page });
+    res.json(resolveFromReq({ success: true, page }, req));
   } catch (err) {
     console.error('Error fetching marketing page:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch page' });
@@ -60,7 +61,7 @@ const createPage = async (req, res) => {
       showInNavigation: showInNavigation !== false,
       navigationOrder: navigationOrder || 0,
       navigationLabel: navigationLabel || '',
-      blocks: blocks || [],
+      blocks: stripUploadHosts(blocks || []),
       customCSS: customCSS || '',
       lastEditedBy: req.user._id,
     });
@@ -95,7 +96,7 @@ const updatePage = async (req, res) => {
 
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
-        page[field] = req.body[field];
+        page[field] = field === 'blocks' ? stripUploadHosts(req.body[field]) : req.body[field];
       }
     });
 

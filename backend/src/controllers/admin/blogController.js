@@ -1,6 +1,7 @@
 const BlogPost = require('../../models/admin/BlogPost');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { toRelativeUploadPath, resolveFromReq } = require('../../utils/helpers/urlHelper');
 
 /**
  * GET /api/v1/admin/blog/posts
@@ -52,7 +53,7 @@ const listPosts = async (req, res) => {
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       posts,
       pagination: {
@@ -60,7 +61,7 @@ const listPosts = async (req, res) => {
         page: parseInt(page),
         pages: Math.ceil(total / limit),
       },
-    });
+    }, req));
   } catch (err) {
     console.error('Error fetching blog posts:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch blog posts' });
@@ -112,7 +113,7 @@ const getPost = async (req, res) => {
     if (!post) {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
-    res.json({ success: true, post });
+    res.json(resolveFromReq({ success: true, post }, req));
   } catch (err) {
     console.error('Error fetching blog post:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch post' });
@@ -144,7 +145,7 @@ const createPost = async (req, res) => {
       slug,
       excerpt,
       content,
-      featuredImage,
+      featuredImage: toRelativeUploadPath(featuredImage),
       author: req.user?._id,
       authorName: authorName || req.user?.name || 'Admin',
       category: category || 'General',
@@ -196,7 +197,7 @@ const updatePost = async (req, res) => {
     if (slug !== undefined) post.slug = slug;
     if (excerpt !== undefined) post.excerpt = excerpt;
     if (content !== undefined) post.content = content;
-    if (featuredImage !== undefined) post.featuredImage = featuredImage;
+    if (featuredImage !== undefined) post.featuredImage = toRelativeUploadPath(featuredImage);
     if (category !== undefined) post.category = category;
     if (tags !== undefined) post.tags = tags;
     if (status !== undefined) post.status = status;

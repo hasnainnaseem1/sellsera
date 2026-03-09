@@ -6,6 +6,9 @@ require('dotenv').config();
 
 const app = express();
 
+// Trust first proxy (Nginx) — makes req.protocol respect X-Forwarded-Proto
+app.set('trust proxy', 1);
+
 // ==========================================
 // MIDDLEWARE
 // ==========================================

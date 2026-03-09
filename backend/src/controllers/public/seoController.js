@@ -1,4 +1,5 @@
 const { AdminSettings, MarketingPage, BlogPost, SeoRedirect } = require('../../models/admin');
+const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 
 /**
  * GET /api/v1/public/seo/sitemap.xml
@@ -134,7 +135,7 @@ const getSettings = async (req, res) => {
     const settings = await AdminSettings.getSettings();
     const seo = settings.seoSettings || {};
 
-    res.json({
+    res.json(resolveFromReq({
       success: true,
       seo: {
         googleAnalyticsId: seo.googleAnalyticsId || '',
@@ -153,7 +154,7 @@ const getSettings = async (req, res) => {
         contactEmail: settings.contactEmail || '',
         logoUrl: settings.themeSettings?.logoUrl || '',
       },
-    });
+    }, req));
   } catch (err) {
     console.error('SEO settings error:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch SEO settings' });
