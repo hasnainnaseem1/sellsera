@@ -9,6 +9,7 @@ const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 const getSiteSettings = async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
+    res.set('Cache-Control', 'no-store');
     res.json(resolveFromReq({
       success: true,
       site: {

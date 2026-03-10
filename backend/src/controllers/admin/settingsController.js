@@ -573,6 +573,7 @@ const updateThemeSettings = async (req, res) => {
     if (accentColor !== undefined) settings.themeSettings.accentColor = accentColor;
     if (companyName !== undefined) settings.themeSettings.companyName = companyName;
 
+    settings.markModified('themeSettings');
     await safeSave(settings);
 
     // Log activity

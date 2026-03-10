@@ -93,7 +93,12 @@ function BlogDetailPage() {
       navigator.share({ title: post.title, url: window.location.href });
     } else {
       navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard!');
+      // Show a brief toast instead of a blocking alert
+      const toast = document.createElement('div');
+      toast.textContent = 'Link copied to clipboard!';
+      Object.assign(toast.style, { position:'fixed',bottom:'2rem',left:'50%',transform:'translateX(-50%)',background:'#333',color:'#fff',padding:'0.75rem 1.5rem',borderRadius:'0.5rem',zIndex:9999,fontSize:'0.875rem' });
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
     }
   };
 
