@@ -2,6 +2,7 @@ const { Feature } = require('../../models/subscription');
 const { ActivityLog } = require('../../models/admin');
 const { Plan } = require('../../models/subscription');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * List all features (paginated, filterable)
@@ -134,9 +135,9 @@ const createFeature = async (req, res) => {
       updatedBy: req.user._id,
     });
 
-    await feature.save();
+    await safeSave(feature);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -193,7 +194,7 @@ const updateFeature = async (req, res) => {
     if (displayOrder !== undefined) feature.displayOrder = displayOrder;
 
     feature.updatedBy = req.user._id;
-    await feature.save();
+    await safeSave(feature);
 
     // Update denormalized feature name in all plans that reference this feature
     if (name && name !== feature.name) {
@@ -204,7 +205,7 @@ const updateFeature = async (req, res) => {
       );
     }
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -254,7 +255,7 @@ const deleteFeature = async (req, res) => {
     const featureName = feature.name;
     await Feature.findByIdAndDelete(feature._id);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -289,9 +290,9 @@ const toggleFeatureStatus = async (req, res) => {
 
     feature.isActive = !feature.isActive;
     feature.updatedBy = req.user._id;
-    await feature.save();
+    await safeSave(feature);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -407,7 +408,7 @@ const bulkDeleteFeatures = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide feature IDs to delete' });
     }
     const result = await Feature.deleteMany({ _id: { $in: ids } });
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId, userName: req.user.name, userEmail: req.user.email, userRole: req.user.role,
       action: 'features_bulk_deleted', actionType: 'delete', targetModel: 'Feature',
       description: `Bulk deleted ${result.deletedCount} features`,

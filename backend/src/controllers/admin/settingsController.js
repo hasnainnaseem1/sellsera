@@ -3,6 +3,7 @@ const { bustMaintenanceCache } = require('../../middleware/security/maintenanceM
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const emailService = require('../../services/email/emailService');
 const { resolveFromReq, toRelativeUploadPath } = require('../../utils/helpers/urlHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 // GET /api/admin/settings
 const getSettings = async (req, res) => {
@@ -55,10 +56,10 @@ const updateGeneralSettings = async (req, res) => {
     if (contactEmail) settings.contactEmail = contactEmail;
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -109,13 +110,13 @@ const updateEmailSettings = async (req, res) => {
     if (fromName) settings.emailSettings.fromName = fromName;
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Invalidate the cached SMTP transporter so the next email uses the new settings
     emailService.resetTransporter();
 
     // Log activity (without password)
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -170,7 +171,7 @@ const sendTestEmail = async (req, res) => {
     const result = await emailService.sendTestEmail(recipientEmail);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -196,7 +197,7 @@ const sendTestEmail = async (req, res) => {
     
     // Log failed attempt
     const clientIP = getClientIP(req);
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -245,10 +246,10 @@ const updateCustomerSettings = async (req, res) => {
     if (freeTrialDays !== undefined) settings.customerSettings.freeTrialDays = freeTrialDays;
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -304,10 +305,10 @@ const updateSecuritySettings = async (req, res) => {
     }
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -363,10 +364,10 @@ const updateNotificationSettings = async (req, res) => {
     }
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -418,13 +419,13 @@ const updateMaintenanceMode = async (req, res) => {
     }
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Bust maintenance cache so changes take effect immediately
     bustMaintenanceCache();
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -476,10 +477,10 @@ const updateFeatureFlags = async (req, res) => {
     if (enableActivityLogs !== undefined) settings.features.enableActivityLogs = enableActivityLogs;
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -572,10 +573,10 @@ const updateThemeSettings = async (req, res) => {
     if (accentColor !== undefined) settings.themeSettings.accentColor = accentColor;
     if (companyName !== undefined) settings.themeSettings.companyName = companyName;
 
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       action: 'settings_updated',
       actionType: 'update',
@@ -643,10 +644,10 @@ const updateBlockedDomains = async (req, res) => {
     const settings = await AdminSettings.getSettings();
     settings.customerSettings.blockedTemporaryEmailDomains = normalizedDomains;
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -703,10 +704,10 @@ const addBlockedDomain = async (req, res) => {
     domains.push(domain);
     settings.customerSettings.blockedTemporaryEmailDomains = domains;
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -764,10 +765,10 @@ const removeBlockedDomain = async (req, res) => {
 
     settings.customerSettings.blockedTemporaryEmailDomains = updatedDomains;
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -819,9 +820,9 @@ const updateGoogleSSO = async (req, res) => {
     }
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -876,7 +877,7 @@ const updateStripeSettings = async (req, res) => {
     }
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Clear cached Stripe instance so it reinitializes with new keys
     try {
@@ -884,7 +885,7 @@ const updateStripeSettings = async (req, res) => {
       if (stripeService.stripe) stripeService.stripe = null;
     } catch (e) { /* ignore */ }
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -959,9 +960,9 @@ const updateEmailTemplate = async (req, res) => {
     settings.emailTemplates[key].subject = (subject || '').trim();
     settings.emailTemplates[key].body = (body || '').trim();
     settings.markModified('emailTemplates');
-    await settings.save();
+    await safeSave(settings);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -996,7 +997,7 @@ const resetEmailTemplate = async (req, res) => {
     if (settings.emailTemplates?.[key]) {
       settings.emailTemplates[key] = { subject: '', body: '' };
       settings.markModified('emailTemplates');
-      await settings.save();
+      await safeSave(settings);
     }
 
     res.json({ success: true, message: `Email template "${key}" reset to default` });

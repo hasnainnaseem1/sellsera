@@ -1,5 +1,6 @@
 const { Analysis } = require('../../models/customer');
 const { User } = require('../../models/user');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 /**
  * POST /api/v1/customer/analyze
@@ -135,11 +136,11 @@ ORDER NOW and get FREE gift wrapping with your purchase!`,
       processingTime: Date.now() - startTime
     });
 
-    await analysis.save();
+    await safeSave(analysis);
 
     // Update legacy analysis count (kept for backward compatibility)
     user.analysisCount += 1;
-    await user.save();
+    await safeSave(user);
 
     // Feature usage info from middleware
     const featureAccess = req.featureAccess || {};

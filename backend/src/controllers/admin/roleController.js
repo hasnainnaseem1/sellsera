@@ -1,6 +1,7 @@
 const { User, CustomRole } = require('../../models/user');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 // @desc    Get all custom roles
 const getRoles = async (req, res) => {
@@ -169,10 +170,10 @@ const createRole = async (req, res) => {
       createdBy: req.userId
     });
 
-    await role.save();
+    await safeSave(role);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -244,10 +245,10 @@ const updateRole = async (req, res) => {
     if (isActive !== undefined) role.isActive = isActive;
     role.updatedBy = req.userId;
 
-    await role.save();
+    await safeSave(role);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -314,7 +315,7 @@ const deleteRole = async (req, res) => {
     await role.deleteOne();
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -395,7 +396,7 @@ const bulkDeleteRoles = async (req, res) => {
     }
     const roleIds = roles.map(r => r._id);
     await CustomRole.deleteMany({ _id: { $in: roleIds } });
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId, userName: req.user.name, userEmail: req.user.email, userRole: req.user.role,
       action: 'roles_bulk_deleted', actionType: 'delete', targetModel: 'CustomRole',
       description: `Bulk deleted ${roles.length} custom roles`,

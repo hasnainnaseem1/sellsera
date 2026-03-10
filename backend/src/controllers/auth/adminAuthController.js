@@ -5,6 +5,7 @@ const { Notification } = require('../../models/notification');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { notifyPasswordResetRequest } = require('../../services/notification/adminNotifier');
 const { getSecuritySettings, msToJwtExpiry, validatePassword } = require('../../utils/helpers/securityHelper');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 // Generate JWT token with dynamic session timeout
 const generateToken = (userId, sessionTimeoutMs) => {
@@ -369,7 +370,7 @@ const changePassword = async (req, res) => {
     if (user.passwordChangeRequired) {
       user.passwordChangeRequired = false;
     }
-    await user.save();
+    await safeSave(user);
 
     // Log password change (non-critical)
     try {
@@ -433,7 +434,7 @@ const updateProfile = async (req, res) => {
     }
 
     user.updatedAt = Date.now();
-    await user.save();
+    await safeSave(user);
 
     // Log profile update (non-critical)
     try {
@@ -506,7 +507,7 @@ const forgotPassword = async (req, res) => {
       const resetToken = require('crypto').randomBytes(32).toString('hex');
       user.passwordResetToken = require('crypto').createHash('sha256').update(resetToken).digest('hex');
       user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-      await user.save();
+      await safeSave(user);
 
       // Log this request (non-critical)
       try {
@@ -636,7 +637,7 @@ const resetPassword = async (req, res) => {
     user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
-    await user.save();
+    await safeSave(user);
 
     res.json({
       success: true,
@@ -709,7 +710,7 @@ const resetPasswordForUser = async (req, res) => {
     if (targetUser.role !== 'super_admin') {
       targetUser.passwordChangeRequired = true;
     }
-    await targetUser.save();
+    await safeSave(targetUser);
 
     // Log this action (non-critical)
     const clientIP = getClientIP(req);

@@ -18,6 +18,7 @@ const emailService = require('../../services/email/emailService');
 const stripeService = require('../../services/stripe/stripeService');
 const { notifySubscriptionChange } = require('../../services/notification/adminNotifier');
 const { generateSignedInvoiceUrl } = require('../../controllers/customer/billingController');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 /**
  * Handle checkout.session.completed
@@ -85,7 +86,7 @@ async function handleCheckoutComplete(session) {
   user.analysisCount = 0;
   user.monthlyResetDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
 
-  await user.save();
+  await safeSave(user);
 
   // Send plan change email
   emailService.sendPlanChangeEmail(user, oldPlanName, plan.name).catch(() => {});
@@ -140,7 +141,7 @@ async function handleInvoicePaid(invoice) {
   // Ensure subscription is active
   if (user.subscriptionStatus !== 'active') {
     user.subscriptionStatus = 'active';
-    await user.save();
+    await safeSave(user);
   }
 
   // Send payment confirmation email with signed invoice URL
@@ -245,7 +246,7 @@ async function handleSubscriptionUpdated(subscription) {
       user.subscriptionExpiresAt = new Date(subscription.current_period_end * 1000);
     }
     
-    await user.save();
+    await safeSave(user);
 
     // Notify admins about subscription status change
     notifySubscriptionChange({
@@ -272,7 +273,7 @@ async function handleSubscriptionDeleted(subscription) {
 
   user.subscriptionStatus = 'cancelled';
   user.subscriptionId = null;
-  await user.save();
+  await safeSave(user);
 
   emailService.sendPlanChangeEmail(user, oldPlanName, 'Cancelled').catch(() => {});
 

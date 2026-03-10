@@ -14,6 +14,7 @@ const User = require('../../models/user/User');
 const emailService = require('../../services/email/emailService');
 const { notifySubscriptionChange } = require('../../services/notification/adminNotifier');
 const { getBaseUrlFromEnv } = require('../../utils/helpers/urlHelper');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 /**
  * Helper: get the active payment gateway from AdminSettings
@@ -181,7 +182,7 @@ const cancelSubscription = async (req, res) => {
       if (immediate) {
         user.subscriptionStatus = 'cancelled';
         user.subscriptionId = null;
-        await user.save();
+        await safeSave(user);
       }
 
       res.json({
@@ -216,7 +217,7 @@ const resumeSubscription = async (req, res) => {
 
       // Update local status immediately (don't wait for webhook)
       user.subscriptionStatus = 'active';
-      await user.save();
+      await safeSave(user);
 
       return res.json({
         success: true,
@@ -234,7 +235,7 @@ const resumeSubscription = async (req, res) => {
 
     // Update local status immediately (don't wait for webhook)
     user.subscriptionStatus = 'active';
-    await user.save();
+    await safeSave(user);
 
     res.json({
       success: true,
@@ -342,7 +343,7 @@ const verifyCheckoutSession = async (req, res) => {
         : session.customer?.id;
     }
 
-    await user.save();
+    await safeSave(user);
 
     // Create Payment record if not already exists (mirrors handleInvoicePaid)
     const invoice = typeof session.subscription === 'object'

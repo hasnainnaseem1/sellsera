@@ -2,6 +2,7 @@ const { Plan, Feature } = require('../../models/subscription');
 const { ActivityLog } = require('../../models/admin');
 const User = require('../../models/user/User');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * List all plans (paginated, filterable)
@@ -162,10 +163,10 @@ const createPlan = async (req, res) => {
       updatedBy: req.user._id
     });
 
-    await plan.save();
+    await safeSave(plan);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -264,10 +265,10 @@ const updatePlan = async (req, res) => {
     }
 
     plan.updatedBy = req.user._id;
-    await plan.save();
+    await safeSave(plan);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -368,7 +369,7 @@ const deletePlan = async (req, res) => {
     await Plan.findByIdAndDelete(plan._id);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -407,9 +408,9 @@ const togglePlanStatus = async (req, res) => {
 
     plan.isActive = !plan.isActive;
     plan.updatedBy = req.user._id;
-    await plan.save();
+    await safeSave(plan);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -455,9 +456,9 @@ const setDefaultPlan = async (req, res) => {
 
     plan.isDefault = true;
     plan.updatedBy = req.user._id;
-    await plan.save();
+    await safeSave(plan);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -602,7 +603,7 @@ const bulkDeletePlans = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Some selected plans have active customers. Reassign them first.' });
     }
     const result = await Plan.deleteMany({ _id: { $in: ids } });
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId, userName: req.user.name, userEmail: req.user.email, userRole: req.user.role,
       action: 'plans_bulk_deleted', actionType: 'delete', targetModel: 'Plan',
       description: `Bulk deleted ${result.deletedCount} plans`,

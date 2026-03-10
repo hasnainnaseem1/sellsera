@@ -2,6 +2,7 @@ const BlogPost = require('../../models/admin/BlogPost');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { toRelativeUploadPath, resolveFromReq } = require('../../utils/helpers/urlHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * GET /api/v1/admin/blog/posts
@@ -156,7 +157,7 @@ const createPost = async (req, res) => {
       seoDescription,
     });
 
-    await post.save();
+    await safeSave(post);
     res.status(201).json({ success: true, post });
   } catch (err) {
     console.error('Error creating blog post:', err);
@@ -206,7 +207,7 @@ const updatePost = async (req, res) => {
     if (seoTitle !== undefined) post.seoTitle = seoTitle;
     if (seoDescription !== undefined) post.seoDescription = seoDescription;
 
-    await post.save();
+    await safeSave(post);
     res.json({ success: true, post });
   } catch (err) {
     console.error('Error updating blog post:', err);
@@ -249,7 +250,7 @@ const togglePostStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Post not found' });
     }
     post.status = status;
-    await post.save();
+    await safeSave(post);
     res.json({ success: true, post });
   } catch (err) {
     console.error('Error updating post status:', err);
@@ -268,7 +269,7 @@ const bulkDeletePosts = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide post IDs to delete' });
     }
     const result = await BlogPost.deleteMany({ _id: { $in: ids } });
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId, userName: req.user.name, userEmail: req.user.email, userRole: req.user.role,
       action: 'blog_posts_bulk_deleted', actionType: 'delete', targetModel: 'BlogPost',
       description: `Bulk deleted ${result.deletedCount} blog posts`,

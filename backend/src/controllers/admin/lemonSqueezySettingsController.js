@@ -7,6 +7,7 @@
 const { AdminSettings } = require('../../models/admin');
 const ActivityLog = require('../../models/admin/ActivityLog');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * PUT /api/v1/admin/settings/lemonsqueezy
@@ -37,7 +38,7 @@ const updateLemonSqueezy = async (req, res) => {
     }
 
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
     // Clear cached service instance so it reinitializes with new keys
     try {
@@ -45,7 +46,7 @@ const updateLemonSqueezy = async (req, res) => {
       lemonSqueezyService.clearCache();
     } catch (e) { /* ignore */ }
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -100,9 +101,9 @@ const updatePaymentGateway = async (req, res) => {
     const settings = await AdminSettings.getSettings();
     settings.activePaymentGateway = gateway;
     settings.lastUpdatedBy = req.userId;
-    await settings.save();
+    await safeSave(settings);
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,

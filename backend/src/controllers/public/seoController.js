@@ -1,5 +1,6 @@
 const { AdminSettings, MarketingPage, BlogPost, SeoRedirect } = require('../../models/admin');
 const { resolveFromReq } = require('../../utils/helpers/urlHelper');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 /**
  * GET /api/v1/public/seo/sitemap.xml
@@ -175,7 +176,7 @@ const checkRedirect = async (req, res) => {
       // Increment hit count
       redirect.hitCount += 1;
       redirect.lastHitAt = new Date();
-      await redirect.save();
+      await safeSave(redirect);
 
       return res.json({
         success: true,

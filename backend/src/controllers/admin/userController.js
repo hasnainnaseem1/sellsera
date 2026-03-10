@@ -4,6 +4,7 @@ const { Notification } = require('../../models/notification');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { formatUserResponse } = require('../../utils/helpers/userFormatter');
 const { validatePassword } = require('../../utils/helpers/securityHelper');
+const { safeSave, safeActivityLog, safeNotification } = require('../../utils/helpers/safeDbOps');
 
 // @route   GET /api/admin/users
 // @desc    Get all users (customers + admins) with pagination and filters
@@ -605,10 +606,10 @@ const createUser = async (req, res) => {
       passwordChangeRequired: role !== 'super_admin'
     });
 
-    await user.save();
+    await safeSave(user);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -626,7 +627,7 @@ const createUser = async (req, res) => {
     });
 
     // Create notification for new admin
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: user._id,
       recipientType: 'admin',
       type: 'welcome',
@@ -713,10 +714,10 @@ const updateUser = async (req, res) => {
       user.updateAnalysisLimit();
     }
 
-    await user.save();
+    await safeSave(user);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -734,7 +735,7 @@ const updateUser = async (req, res) => {
     });
 
     // Notify user of changes
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: user._id,
       type: 'admin_message',
       title: 'Account Updated',
@@ -802,7 +803,7 @@ const deleteUser = async (req, res) => {
     await user.deleteOne();
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -858,10 +859,10 @@ const suspendUser = async (req, res) => {
     }
 
     user.status = 'suspended';
-    await user.save();
+    await safeSave(user);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -879,7 +880,7 @@ const suspendUser = async (req, res) => {
     });
 
     // Notify user
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: user._id,
       type: 'account_suspended',
       title: 'Account Suspended',
@@ -918,10 +919,10 @@ const activateUser = async (req, res) => {
     }
 
     user.status = 'active';
-    await user.save();
+    await safeSave(user);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -938,7 +939,7 @@ const activateUser = async (req, res) => {
     });
 
     // Notify user
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: user._id,
       type: 'account_activated',
       title: 'Account Activated',
@@ -987,7 +988,7 @@ const bulkDeleteUsers = async (req, res) => {
     const deleteIds = toDelete.map(u => u._id);
     await User.deleteMany({ _id: { $in: deleteIds } });
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId, userName: req.user.name, userEmail: req.user.email, userRole: req.user.role,
       action: 'users_bulk_deleted', actionType: 'delete', targetModel: 'User',
       description: `Bulk deleted ${toDelete.length} users`,

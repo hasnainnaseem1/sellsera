@@ -6,6 +6,7 @@ const { Plan } = require('../../models/subscription');
 const { Payment } = require('../../models/payment');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { notifySubscriptionChange, notifyCustomerStatusChange } = require('../../services/notification/adminNotifier');
+const { safeSave, safeActivityLog, safeNotification } = require('../../utils/helpers/safeDbOps');
 
 // @route   GET /api/admin/customers
 // @desc    Get all customers with detailed info
@@ -809,10 +810,10 @@ const updateCustomerPlan = async (req, res) => {
     const now = new Date();
     customer.monthlyResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    await customer.save();
+    await safeSave(customer);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -831,7 +832,7 @@ const updateCustomerPlan = async (req, res) => {
 
     // Notify customer
     const notificationType = plan === 'free' ? 'plan_downgraded' : 'plan_upgraded';
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: customer._id,
       type: notificationType,
       title: `Plan ${plan === 'free' ? 'Downgraded' : 'Upgraded'}`,
@@ -893,7 +894,7 @@ const resetCustomerUsage = async (req, res) => {
     await customer.resetMonthlyCount();
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -910,7 +911,7 @@ const resetCustomerUsage = async (req, res) => {
     });
 
     // Notify customer
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: customer._id,
       type: 'admin_message',
       title: 'Usage Reset',
@@ -967,10 +968,10 @@ const verifyCustomerEmail = async (req, res) => {
     customer.status = 'active';
     // Keep the verification token so the email link still works
     // (it will return "already verified" instead of "invalid")
-    await customer.save();
+    await safeSave(customer);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -987,7 +988,7 @@ const verifyCustomerEmail = async (req, res) => {
     });
 
     // Notify customer
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: customer._id,
       type: 'email_verification',
       title: 'Email Verified',
@@ -1131,10 +1132,10 @@ const assignCustomerPlan = async (req, res) => {
       customer.subscriptionExpiresAt = null;
     }
 
-    await customer.save();
+    await safeSave(customer);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -1152,7 +1153,7 @@ const assignCustomerPlan = async (req, res) => {
     });
 
     // Notify customer
-    await Notification.createNotification({
+    await safeNotification(Notification, {
       recipientId: customer._id,
       type: 'plan_upgraded',
       title: 'Plan Updated',
@@ -1223,10 +1224,10 @@ const updateCustomerStatus = async (req, res) => {
     }
 
     customer.status = status;
-    await customer.save();
+    await safeSave(customer);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -1252,7 +1253,7 @@ const updateCustomerStatus = async (req, res) => {
     }
 
     if (notificationMessage) {
-      await Notification.createNotification({
+      await safeNotification(Notification, {
         recipientId: customer._id,
         type: status === 'suspended' ? 'account_suspended' : 'account_activated',
         title: 'Account Status Updated',
@@ -1309,7 +1310,7 @@ const deleteCustomer = async (req, res) => {
     await Notification.deleteMany({ userId: customer._id });
     await customer.deleteOne();
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -1355,7 +1356,7 @@ const bulkDeleteCustomers = async (req, res) => {
     await Notification.deleteMany({ userId: { $in: customerIds } });
     await User.deleteMany({ _id: { $in: customerIds } });
 
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,

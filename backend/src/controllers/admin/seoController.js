@@ -1,5 +1,6 @@
 const { AdminSettings, SeoRedirect } = require('../../models/admin');
 const { resolveFromReq, toRelativeUploadPath, stripUploadHosts } = require('../../utils/helpers/urlHelper');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 /**
  * GET /api/v1/admin/seo/settings
@@ -52,7 +53,7 @@ const updateSettings = async (req, res) => {
     if (enableSchemaMarkup !== undefined) settings.seoSettings.enableSchemaMarkup = enableSchemaMarkup;
 
     settings.markModified('seoSettings');
-    await settings.save();
+    await safeSave(settings);
 
     res.json(resolveFromReq({ success: true, seoSettings: settings.seoSettings }, req));
   } catch (err) {
@@ -132,7 +133,7 @@ const createRedirect = async (req, res) => {
       createdBy: req.user?._id,
     });
 
-    await redirect.save();
+    await safeSave(redirect);
     res.status(201).json({ success: true, redirect });
   } catch (err) {
     console.error('Error creating redirect:', err);
@@ -169,7 +170,7 @@ const updateRedirect = async (req, res) => {
     if (isActive !== undefined) redirect.isActive = isActive;
     if (note !== undefined) redirect.note = note;
 
-    await redirect.save();
+    await safeSave(redirect);
     res.json({ success: true, redirect });
   } catch (err) {
     console.error('Error updating redirect:', err);
@@ -205,7 +206,7 @@ const toggleRedirect = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Redirect not found' });
     }
     redirect.isActive = !redirect.isActive;
-    await redirect.save();
+    await safeSave(redirect);
     res.json({ success: true, redirect });
   } catch (err) {
     console.error('Error toggling redirect:', err);

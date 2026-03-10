@@ -10,6 +10,7 @@ const { getClientIP } = require('../../utils/helpers/ipHelper');
 const emailService = require('../../services/email/emailService');
 const { notifyNewCustomer, notifyCustomerPasswordReset } = require('../../services/notification/adminNotifier');
 const { getSecuritySettings, msToJwtExpiry, validatePassword } = require('../../utils/helpers/securityHelper');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 // Generate JWT token with dynamic session timeout
 const generateToken = (userId, sessionTimeoutMs) => {
@@ -142,7 +143,7 @@ const googleSSO = async (req, res) => {
 
       user.lastLogin = new Date();
       user.lastLoginIP = clientIP;
-      await user.save();
+      await safeSave(user);
 
     } else {
       // New user → this is a signup — check enableCustomerSignup
@@ -199,7 +200,7 @@ const googleSSO = async (req, res) => {
         console.error('Could not assign default plan (Google signup):', planErr.message);
       }
 
-      await user.save();
+      await safeSave(user);
 
       // Send welcome email asynchronously (don't block login)
       emailService.sendWelcomeEmail?.(user).catch(() => {});
@@ -373,7 +374,7 @@ const signup = async (req, res) => {
       // Continue with signup even if default plan assignment fails
     }
 
-    await user.save();
+    await safeSave(user);
 
     // Send raw token in URL; DB stores the hash
     const verificationLink = `${process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002'}/verify-email/${rawVerificationToken}`;
@@ -723,7 +724,7 @@ const verifyEmail = async (req, res) => {
     // Verify the user
     user.isEmailVerified = true;
     user.status = 'active';
-    await user.save();
+    await safeSave(user);
 
     // Send welcome email after successful verification (fire-and-forget)
     emailService.sendWelcomeEmail(user).catch((err) => {
@@ -806,7 +807,7 @@ const resendVerification = async (req, res) => {
 
     user.emailVerificationToken = hashToken(rawVerifToken); // store hash
     user.emailVerificationExpires = verificationExpiry;
-    await user.save();
+    await safeSave(user);
 
     const verificationLink = `${process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002'}/verify-email/${rawVerifToken}`;
 
@@ -988,7 +989,7 @@ const changePassword = async (req, res) => {
 
     // Assign plain password — the User model pre-save hook handles bcrypt hashing
     user.password = newPassword;
-    await user.save();
+    await safeSave(user);
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
@@ -1066,7 +1067,7 @@ const forgotPassword = async (req, res) => {
     user.passwordResetToken = hashToken(rawResetToken); // store hash, send raw
     user.passwordResetExpires = resetExpiry;
     user.resetPasswordRequestedAt = new Date();
-    await user.save();
+    await safeSave(user);
 
     const resetLink = `${process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002'}/reset-password/${rawResetToken}`;
 
@@ -1158,7 +1159,7 @@ const resetPassword = async (req, res) => {
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     user.passwordChangeRequired = false;
-    await user.save();
+    await safeSave(user);
 
     // Notify admins about customer password reset completion
     notifyCustomerPasswordReset(user, 'completed').catch(() => {});

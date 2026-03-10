@@ -1,6 +1,7 @@
 const { User } = require('../../models/user');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * POST /api/v1/admin/dev-utils/verify-customer
@@ -49,10 +50,10 @@ const verifyCustomer = async (req, res) => {
     customer.status = 'active';
     customer.emailVerificationToken = undefined;
     customer.emailVerificationExpires = undefined;
-    await customer.save();
+    await safeSave(customer);
 
     // Log the activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -130,10 +131,10 @@ const createTestCustomer = async (req, res) => {
       isEmailVerified: true, // Auto-verified
     });
 
-    await user.save();
+    await safeSave(user);
 
     // Log activity
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.user._id,
       userName: req.user.name,
       userEmail: req.user.email,

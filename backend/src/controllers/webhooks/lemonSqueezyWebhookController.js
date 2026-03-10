@@ -24,6 +24,7 @@ const emailService = require('../../services/email/emailService');
 const { notifySubscriptionChange } = require('../../services/notification/adminNotifier');
 const { generateSignedInvoiceUrl } = require('../../controllers/customer/billingController');
 const lemonSqueezyService = require('../../services/lemonsqueezy/lemonSqueezyService');
+const { safeSave } = require('../../utils/helpers/safeDbOps');
 
 const TAG = '[LemonSqueezy]';
 
@@ -114,7 +115,7 @@ const handleSubscriptionCreated = async (event, customData) => {
   user.analysisCount = 0;
   user.monthlyResetDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
 
-  await user.save();
+  await safeSave(user);
 
   // Async notifications (fire-and-forget)
   emailService.sendPlanChangeEmail(user, oldPlanName, plan.name).catch(() => {});
@@ -147,7 +148,7 @@ const handleSubscriptionUpdated = async (event, customData) => {
     if (attrs.renews_at) user.subscriptionExpiresAt = new Date(attrs.renews_at);
     if (attrs.trial_ends_at) user.trialEndsAt = new Date(attrs.trial_ends_at);
 
-    await user.save();
+    await safeSave(user);
 
     notifySubscriptionChange({
       customer: user,
@@ -172,7 +173,7 @@ const handleSubscriptionCancelled = async (event, customData) => {
   const endsAt = event.data.attributes.ends_at;
 
   if (endsAt) user.subscriptionExpiresAt = new Date(endsAt);
-  await user.save();
+  await safeSave(user);
 
   emailService.sendPlanChangeEmail(user, oldPlanName, 'Cancelled (at period end)').catch(() => {});
   notifySubscriptionChange({
@@ -197,7 +198,7 @@ const handleSubscriptionResumed = async (event, customData) => {
   if (event.data.attributes.renews_at) {
     user.subscriptionExpiresAt = new Date(event.data.attributes.renews_at);
   }
-  await user.save();
+  await safeSave(user);
 
   console.log(`${TAG} Subscription resumed: ${user.email}`);
 };
@@ -212,7 +213,7 @@ const handleSubscriptionExpired = async (event, customData) => {
   const oldPlanName = user.planSnapshot?.planName || 'Unknown';
   user.subscriptionStatus = 'expired';
   user.lemonSqueezySubscriptionId = null;
-  await user.save();
+  await safeSave(user);
 
   emailService.sendPlanChangeEmail(user, oldPlanName, 'Expired').catch(() => {});
   notifySubscriptionChange({
@@ -234,7 +235,7 @@ const handleSubscriptionPaused = async (event, customData) => {
   if (!user) return;
 
   user.subscriptionStatus = 'cancelled';
-  await user.save();
+  await safeSave(user);
 
   console.log(`${TAG} Subscription paused: ${user.email}`);
 };
@@ -250,7 +251,7 @@ const handleSubscriptionUnpaused = async (event, customData) => {
   if (event.data.attributes.renews_at) {
     user.subscriptionExpiresAt = new Date(event.data.attributes.renews_at);
   }
-  await user.save();
+  await safeSave(user);
 
   console.log(`${TAG} Subscription unpaused: ${user.email}`);
 };
@@ -348,7 +349,7 @@ const handlePaymentSuccess = async (event, customData) => {
   // Ensure subscription is active after successful payment
   if (user.subscriptionStatus !== 'active') {
     user.subscriptionStatus = 'active';
-    await user.save();
+    await safeSave(user);
   }
 
   console.log(`${TAG} Payment success: ${user.email}`);

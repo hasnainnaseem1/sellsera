@@ -1,5 +1,6 @@
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 // @desc    Get activity logs with filters
 const getLogs = async (req, res) => {
@@ -212,7 +213,7 @@ const deleteOldLogs = async (req, res) => {
     });
 
     // Log this action
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,
@@ -270,7 +271,7 @@ const deleteLogsByRange = async (req, res) => {
     });
 
     // Log this action
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: req.user.name,
       userEmail: req.user.email,

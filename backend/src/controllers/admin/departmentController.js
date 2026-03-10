@@ -2,6 +2,7 @@ const Department = require('../../models/admin/Department');
 const User = require('../../models/user/User');
 const ActivityLog = require('../../models/admin/ActivityLog');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * GET /api/v1/admin/departments
@@ -147,11 +148,11 @@ const createDepartment = async (req, res) => {
       createdBy: req.userId
     });
     
-    await department.save();
+    await safeSave(department);
     
     // Log activity
     const user = await User.findById(req.userId);
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: user.name,
       userEmail: user.email,
@@ -238,11 +239,11 @@ const updateDepartment = async (req, res) => {
     if (isActive !== undefined) department.isActive = isActive;
     department.updatedBy = req.userId;
     
-    await department.save();
+    await safeSave(department);
     
     // Log activity
     const user = await User.findById(req.userId);
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: user.name,
       userEmail: user.email,
@@ -312,7 +313,7 @@ const deleteDepartment = async (req, res) => {
     
     // Log activity
     const user = await User.findById(req.userId);
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId,
       userName: user.name,
       userEmail: user.email,

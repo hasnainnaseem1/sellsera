@@ -2,6 +2,7 @@ const MarketingPage = require('../../models/admin/MarketingPage');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { stripUploadHosts, resolveFromReq } = require('../../utils/helpers/urlHelper');
+const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
 
 /**
  * GET /api/v1/admin/marketing/pages
@@ -66,7 +67,7 @@ const createPage = async (req, res) => {
       lastEditedBy: req.user._id,
     });
 
-    await page.save();
+    await safeSave(page);
     res.status(201).json({ success: true, page, message: 'Page created successfully' });
   } catch (err) {
     if (err.code === 11000) {
@@ -101,7 +102,7 @@ const updatePage = async (req, res) => {
     });
 
     page.lastEditedBy = req.user._id;
-    await page.save();
+    await safeSave(page);
 
     res.json({ success: true, page, message: 'Page updated successfully' });
   } catch (err) {
@@ -187,7 +188,7 @@ const clonePage = async (req, res) => {
       lastEditedBy: req.user._id,
     });
 
-    await cloned.save();
+    await safeSave(cloned);
     res.status(201).json({ success: true, page: cloned, message: 'Page cloned successfully' });
   } catch (err) {
     console.error('Error cloning page:', err);
@@ -252,7 +253,7 @@ const bulkDeletePages = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Cannot delete the home page. Remove it from selection.' });
     }
     const result = await MarketingPage.deleteMany({ _id: { $in: ids } });
-    await ActivityLog.logActivity({
+    await safeActivityLog(ActivityLog, {
       userId: req.userId, userName: req.user.name, userEmail: req.user.email, userRole: req.user.role,
       action: 'pages_bulk_deleted', actionType: 'delete', targetModel: 'MarketingPage',
       description: `Bulk deleted ${result.deletedCount} marketing pages`,
