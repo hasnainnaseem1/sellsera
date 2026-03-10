@@ -113,6 +113,11 @@ const getLogs = async (req, res) => {
 // @desc    Get single activity log
 const getLog = async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid log ID format' });
+    }
+
     const log = await ActivityLog.findById(req.params.id)
       .populate('userId', 'name email accountType role status');
 

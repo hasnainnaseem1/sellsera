@@ -9,6 +9,8 @@
         "seed": "node src/scripts/seed/seedSuperAdmin.js",
         "migrate": "node src/scripts/migration/migrateExistingCustomers.js",
         "migrate:database": "node src/scripts/migration/migrateSellersToCustomers.js",
+        "fix-ids": "node src/scripts/migration/fixObjectIds.js",
+        "fix-ids:dry": "node src/scripts/migration/fixObjectIds.js --dry-run --verbose",
         "test": "jest --config ../tests/backend/jest.config.js --forceExit --detectOpenHandles",
         "test:watch": "jest --config ../tests/backend/jest.config.js --watch --forceExit --detectOpenHandles",
         "test:verbose": "jest --config ../tests/backend/jest.config.js --verbose --forceExit --detectOpenHandles",
