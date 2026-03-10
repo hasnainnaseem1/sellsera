@@ -239,32 +239,32 @@ async function getAnalysesTrend(req, res) {
 }
 
 // @route   GET /api/admin/analytics/subscription-distribution
-// @desc    Get subscription plan distribution
+// @desc    Get subscription plan distribution (dynamic — uses Plan model)
 // @access  Private (Admin with analytics.view permission)
 async function getSubscriptionDistribution(req, res) {
   try {
-    const distribution = [
-      {
-        plan: 'Free',
-        count: await User.countDocuments({ accountType: 'customer', plan: 'free' }),
-        revenue: 0
-      },
-      {
-        plan: 'Starter',
-        count: await User.countDocuments({ accountType: 'customer', plan: 'starter' }),
-        revenue: 19
-      },
-      {
-        plan: 'Pro',
-        count: await User.countDocuments({ accountType: 'customer', plan: 'pro' }),
-        revenue: 49
-      },
-      {
-        plan: 'Unlimited',
-        count: await User.countDocuments({ accountType: 'customer', plan: 'unlimited' }),
-        revenue: 79
-      }
-    ];
+    const plans = await Plan.find({ isActive: true }).sort({ displayOrder: 1 }).lean();
+
+    const distribution = await Promise.all(
+      plans.map(async (plan) => {
+        const count = await User.countDocuments({ accountType: 'customer', currentPlan: plan._id });
+        return {
+          plan: plan.name,
+          planId: plan._id,
+          count,
+          revenue: plan.price?.monthly || 0
+        };
+      })
+    );
+
+    // Include customers with no plan assigned
+    const unassignedCount = await User.countDocuments({
+      accountType: 'customer',
+      $or: [{ currentPlan: null }, { currentPlan: { $exists: false } }],
+    });
+    if (unassignedCount > 0) {
+      distribution.push({ plan: 'Free', planId: null, count: unassignedCount, revenue: 0 });
+    }
 
     const totalRevenue = distribution.reduce((sum, item) => sum + (item.count * item.revenue), 0);
 
