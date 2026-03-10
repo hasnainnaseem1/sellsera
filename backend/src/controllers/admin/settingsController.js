@@ -575,10 +575,11 @@ const updateThemeSettings = async (req, res) => {
 
     settings.markModified('themeSettings');
     await safeSave(settings);
-    // Direct update to guarantee nested themeSettings persists
+    // Direct update to guarantee nested themeSettings persists (plain object avoids Mongoose serialization issues)
+    const themePlain = JSON.parse(JSON.stringify(settings.themeSettings));
     await AdminSettings.updateOne(
       { _id: settings._id },
-      { $set: { themeSettings: settings.themeSettings } }
+      { $set: { themeSettings: themePlain } }
     );
 
     // Log activity
@@ -649,8 +650,14 @@ const updateBlockedDomains = async (req, res) => {
 
     const settings = await AdminSettings.getSettings();
     settings.customerSettings.blockedTemporaryEmailDomains = normalizedDomains;
+    settings.markModified('customerSettings');
     settings.lastUpdatedBy = req.userId;
     await safeSave(settings);
+    // Direct update to guarantee nested array persists
+    await AdminSettings.updateOne(
+      { _id: settings._id },
+      { $set: { 'customerSettings.blockedTemporaryEmailDomains': normalizedDomains } }
+    );
 
     // Log activity
     await safeActivityLog(ActivityLog, {

@@ -15,6 +15,7 @@ const emailService = require('../../services/email/emailService');
 const { notifySubscriptionChange } = require('../../services/notification/adminNotifier');
 const { getBaseUrlFromEnv } = require('../../utils/helpers/urlHelper');
 const { safeSave } = require('../../utils/helpers/safeDbOps');
+const mongoose = require('mongoose');
 
 /**
  * Helper: get the active payment gateway from AdminSettings
@@ -33,6 +34,10 @@ const createCheckout = async (req, res) => {
 
     if (!planId) {
       return res.status(400).json({ success: false, message: 'Plan ID is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(planId)) {
+      return res.status(400).json({ success: false, message: 'Invalid plan ID format' });
     }
 
     // Pre-check: is a payment gateway configured?
@@ -88,6 +93,10 @@ const createCheckout = async (req, res) => {
     res.json({ success: true, url: session.url, sessionId: session.id, gateway: 'stripe' });
   } catch (error) {
     console.error('Checkout session error:', error);
+    // Stripe/LemonSqueezy not configured or auth failure → 503
+    if (error.message?.includes('not configured') || error.type === 'StripeAuthenticationError') {
+      return res.status(503).json({ success: false, message: 'Payment gateway is not properly configured. Contact admin.' });
+    }
     res.status(500).json({ success: false, message: error.message || 'Failed to create checkout session' });
   }
 };
@@ -123,6 +132,10 @@ const createPortal = async (req, res) => {
     res.json({ success: true, url: session.url, gateway: 'stripe' });
   } catch (error) {
     console.error('Portal session error:', error);
+    // Stripe/LemonSqueezy not configured or auth failure → 503
+    if (error.message?.includes('not configured') || error.type === 'StripeAuthenticationError') {
+      return res.status(503).json({ success: false, message: 'Payment gateway is not properly configured. Contact admin.' });
+    }
     res.status(500).json({ success: false, message: error.message || 'Failed to create portal session' });
   }
 };
