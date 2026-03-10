@@ -20,7 +20,7 @@ const { safeSave } = require('../../utils/helpers/safeDbOps');
  * Helper: get the active payment gateway from AdminSettings
  */
 const getActiveGateway = async () => {
-  const settings = await AdminSettings.findOne();
+  const settings = await AdminSettings.findOne().sort({ _id: 1 });
   return settings?.activePaymentGateway || 'stripe';
 };
 
@@ -36,7 +36,7 @@ const createCheckout = async (req, res) => {
     }
 
     // Pre-check: is a payment gateway configured?
-    const gwSettings = await AdminSettings.findOne().select('activePaymentGateway stripeSettings lemonSqueezySettings').lean();
+    const gwSettings = await AdminSettings.findOne().sort({ _id: 1 }).select('activePaymentGateway stripeSettings lemonSqueezySettings').lean();
     const gw = gwSettings?.activePaymentGateway || 'stripe';
     if (gw === 'stripe' && !gwSettings?.stripeSettings?.secretKey) {
       return res.status(503).json({ success: false, message: 'Payment gateway (Stripe) is not configured. Contact admin.' });
@@ -98,7 +98,7 @@ const createCheckout = async (req, res) => {
 const createPortal = async (req, res) => {
   try {
     // Pre-check: is a payment gateway configured?
-    const gwSettings = await AdminSettings.findOne().select('activePaymentGateway stripeSettings lemonSqueezySettings').lean();
+    const gwSettings = await AdminSettings.findOne().sort({ _id: 1 }).select('activePaymentGateway stripeSettings lemonSqueezySettings').lean();
     const gwCheck = gwSettings?.activePaymentGateway || 'stripe';
     if (gwCheck === 'stripe' && !gwSettings?.stripeSettings?.secretKey) {
       return res.status(503).json({ success: false, message: 'Payment gateway (Stripe) is not configured. Contact admin.' });
