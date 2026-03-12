@@ -340,8 +340,14 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
     setPortalLoading(true);
     try {
       const data = await billingApi.createPortal();
-      if (data.success && data.url) window.location.href = data.url;
-      else message.error(data.message || "Could not open billing portal");
+      if (data.inApp) {
+        // LemonSqueezy: navigate to in-app billing tab
+        onChangeTab("billing");
+      } else if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        message.error(data.message || "Could not open billing portal");
+      }
     } catch (err) {
       message.error(err.response?.data?.message || "Could not open billing portal.");
     } finally {
@@ -666,7 +672,6 @@ const BillingTab = ({ card, tok, isDark, user }) => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-  const [portalLoading, setPortalLoading] = useState(false);
 
   const loadPayments = useCallback(async (page = 1, limit = 10) => {
     try {
@@ -683,18 +688,7 @@ const BillingTab = ({ card, tok, isDark, user }) => {
 
   useEffect(() => { loadPayments(); }, [loadPayments]);
 
-  const handleManageBilling = async () => {
-    setPortalLoading(true);
-    try {
-      const data = await billingApi.createPortal();
-      if (data.success && data.url) window.location.href = data.url;
-      else message.error(data.message || "Could not open billing portal");
-    } catch (err) {
-      message.error(err.response?.data?.message || "Could not open billing portal.");
-    } finally {
-      setPortalLoading(false);
-    }
-  };
+  // Billing tab: no "Manage Billing" button needed — user is already here
 
   const columns = [
     {
@@ -762,11 +756,6 @@ const BillingTab = ({ card, tok, isDark, user }) => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
-        <Button type="primary" icon={<ExportOutlined />} onClick={handleManageBilling} loading={portalLoading}
-          style={{ background: BRAND, borderColor: BRAND, fontWeight: 600 }}>Manage Billing</Button>
-      </div>
-
       <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
           <Card style={card} styles={{ body: { padding: "20px 24px" } }}>

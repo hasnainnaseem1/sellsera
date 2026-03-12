@@ -119,8 +119,9 @@ const createPortal = async (req, res) => {
     const gateway = await getActiveGateway();
 
     if (gateway === 'lemonsqueezy') {
-      const portalUrl = await lemonSqueezyService.getCustomerPortalUrl(req.user);
-      return res.json({ success: true, url: portalUrl, gateway: 'lemonsqueezy' });
+      // LemonSqueezy's customer portal requires LS login — useless for end-users.
+      // Return inApp flag so the frontend navigates to the in-app billing tab instead.
+      return res.json({ success: true, inApp: true, gateway: 'lemonsqueezy' });
     }
 
     // Default: Stripe

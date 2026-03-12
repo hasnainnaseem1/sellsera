@@ -6,7 +6,7 @@ import {
 import {
   CreditCardOutlined, DollarOutlined, DownloadOutlined,
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
-  FileTextOutlined, ExportOutlined
+  FileTextOutlined
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -31,7 +31,6 @@ const BillingPage = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-  const [portalLoading, setPortalLoading] = useState(false);
 
   const card = {
     border: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
@@ -61,19 +60,7 @@ const BillingPage = () => {
     loadPayments();
   }, [loadPayments]);
 
-  const handleManageBilling = async () => {
-    setPortalLoading(true);
-    try {
-      const data = await billingApi.createPortal();
-      if (data.success && data.url) window.location.href = data.url;
-      else message.error(data.message || 'Could not open billing portal');
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Could not open billing portal. You may need an active subscription first.';
-      message.error(msg);
-    } finally {
-      setPortalLoading(false);
-    }
-  };
+  // Manage Billing is handled in-app — no external portal redirect needed
 
   const columns = [
     {
@@ -163,15 +150,6 @@ const BillingPage = () => {
             </Title>
             <Text type="secondary">View your payment history and invoices</Text>
           </div>
-          <Button
-            type="primary"
-            icon={<ExportOutlined />}
-            onClick={handleManageBilling}
-            loading={portalLoading}
-            style={{ background: BRAND, borderColor: BRAND, fontWeight: 600 }}
-          >
-            Manage Billing
-          </Button>
         </div>
 
         {/* Stats */}
