@@ -5,10 +5,10 @@ import {
   Layout, Menu, Avatar, Dropdown, Button, Typography, Tooltip, Divider
 } from 'antd';
 import {
-  DashboardOutlined, UserOutlined,
+  DashboardOutlined,
   LogoutOutlined, MoonOutlined, SunOutlined, MenuFoldOutlined,
   MenuUnfoldOutlined, QuestionCircleOutlined, RocketOutlined,
-  WalletOutlined, CrownOutlined, SettingOutlined
+  SettingOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -27,7 +27,6 @@ const AppLayout = ({ children }) => {
   const { isDark, toggleTheme } = useTheme();
   const { siteConfig } = useSite();
   const [collapsed, setCollapsed] = useState(false);
-  const subscriptionsEnabled = siteConfig?.enableSubscriptions !== false;
 
   const handleLogout = useCallback(async () => {
     try {
@@ -51,11 +50,6 @@ const AppLayout = ({ children }) => {
   ];
 
   const userMenuItems = [
-    { key: 'profile',  icon: <UserOutlined />,   label: 'My Profile',    onClick: () => navigate('/settings?tab=profile') },
-    ...(subscriptionsEnabled ? [
-      { key: 'subscription', icon: <RocketOutlined />, label: 'Subscription', onClick: () => navigate('/settings?tab=subscription') },
-    ] : []),
-    { key: 'settings', icon: <SettingOutlined />, label: 'Settings', onClick: () => navigate('/settings') },
     { type: 'divider' },
     { key: 'logout',   icon: <LogoutOutlined style={{ color: '#ff4d4f' }} />, label: <span style={{ color: '#ff4d4f' }}>Logout</span>, onClick: handleLogout },
   ];
@@ -127,14 +121,25 @@ const AppLayout = ({ children }) => {
           borderBottom: `1px solid ${isDark ? '#2e2e4a' : '#f0f0f5'}`,
           gap: 10,
         }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: `linear-gradient(135deg, ${BRAND}, ${BRAND2})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(108,99,255,0.4)',
-          }}>
-            <RocketOutlined style={{ color: '#fff', fontSize: 18 }} />
-          </div>
+          {siteConfig?.logoUrl ? (
+            <img
+              src={siteConfig.logoUrl}
+              alt={siteConfig?.siteName || 'Logo'}
+              style={{
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                objectFit: 'contain',
+              }}
+            />
+          ) : (
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: `linear-gradient(135deg, ${BRAND}, ${BRAND2})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(108,99,255,0.4)',
+            }}>
+              <RocketOutlined style={{ color: '#fff', fontSize: 18 }} />
+            </div>
+          )}
           {!collapsed && (
             <Text strong style={{ fontSize: 17, background: `linear-gradient(90deg,${BRAND},${BRAND2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {siteConfig?.siteName || 'AppCenter'}

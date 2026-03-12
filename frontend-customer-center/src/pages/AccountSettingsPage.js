@@ -309,7 +309,6 @@ const SecurityTab = ({ card, gradBtn, tok, isDark, token }) => {
 
 /* ═══════════════════════════════════════ SUBSCRIPTION TAB ═══════════════════════════════════════ */
 const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab }) => {
-  const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const hasFetched = useRef(false);
@@ -337,22 +336,8 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
   const hasSubscription = isActive || isTrial || isCancelled || isPastDue;
 
   const handleManageBilling = async () => {
-    setPortalLoading(true);
-    try {
-      const data = await billingApi.createPortal();
-      if (data.inApp) {
-        // LemonSqueezy: navigate to in-app billing tab
-        onChangeTab("billing");
-      } else if (data.success && data.url) {
-        window.location.href = data.url;
-      } else {
-        message.error(data.message || "Could not open billing portal");
-      }
-    } catch (err) {
-      message.error(err.response?.data?.message || "Could not open billing portal.");
-    } finally {
-      setPortalLoading(false);
-    }
+    // For LemonSqueezy, just navigate to billing tab (no external portal)
+    onChangeTab("billing");
   };
 
   const handleCancel = () => {
@@ -423,7 +408,7 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
       {isPastDue && (
         <Alert type="error" showIcon style={{ marginBottom: 20, borderRadius: 12 }}
           message="Payment past due" description="Please update your payment method to avoid service interruption."
-          action={<Button type="primary" danger size="small" onClick={handleManageBilling} loading={portalLoading}>Update Payment</Button>} />
+          action={<Button type="primary" danger size="small" onClick={handleManageBilling}>Update Payment</Button>} />
       )}
 
       {/* Plan Card */}
@@ -461,7 +446,7 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
                 {isActive ? "Change Plan" : "Upgrade"}
               </Button>
               {hasSubscription && (
-                <Button icon={<CreditCardOutlined />} onClick={handleManageBilling} loading={portalLoading} style={{ fontWeight: 600 }}>Manage Billing</Button>
+                <Button icon={<CreditCardOutlined />} onClick={handleManageBilling} style={{ fontWeight: 600 }}>Manage Billing</Button>
               )}
               {isCancelled && (
                 <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleResume} loading={resumeLoading}
