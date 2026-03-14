@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card, Table, Typography, Tag, Progress, Row, Col, Statistic,
-  Space, Empty, Button, theme, Input, message,
+  Button, theme, Input, message,
 } from 'antd';
 import {
-  ShopOutlined, CheckCircleOutlined, WarningOutlined,
+  ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
-  EyeOutlined, RiseOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -34,11 +34,10 @@ const ActiveListingsPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess } = usePermissions();
-  const access = getFeatureAccess('active_listings');
+  getFeatureAccess('active_listings');
 
-  const [listings, setListings] = useState(MOCK_LISTINGS);
+  const [listings] = useState(MOCK_LISTINGS);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const card = {
     borderRadius: radii.lg,
@@ -51,7 +50,6 @@ const ActiveListingsPage = () => {
     : listings;
 
   const totalViews = listings.reduce((s, l) => s + l.views, 0);
-  const totalRevenue = listings.reduce((s, l) => s + l.revenue, 0);
   const avgScore = Math.round(listings.reduce((s, l) => s + l.seoScore, 0) / listings.length);
   const needsFix = listings.filter(l => l.seoScore < 60).length;
 

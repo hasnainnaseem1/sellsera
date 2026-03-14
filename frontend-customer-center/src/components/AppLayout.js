@@ -10,9 +10,9 @@ import {
   MenuUnfoldOutlined, QuestionCircleOutlined, RocketOutlined,
   SettingOutlined, SearchOutlined, HistoryOutlined,
   KeyOutlined, TeamOutlined, LockOutlined,
-  TagsOutlined, OrderedListOutlined, ToolOutlined,
+  TagsOutlined, OrderedListOutlined,
   ShopOutlined, LineChartOutlined, TruckOutlined,
-  EnvironmentOutlined, BulbOutlined, BarChartOutlined,
+  EnvironmentOutlined, BarChartOutlined,
   FileSearchOutlined, AuditOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';

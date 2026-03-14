@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import {
   TagsOutlined, ThunderboltOutlined, CheckCircleOutlined,
-  WarningOutlined, CloseCircleOutlined, CopyOutlined,
+  WarningOutlined, CloseCircleOutlined,
   BulbOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
@@ -16,7 +16,7 @@ import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { TextArea } = Input;
 const BRAND = '#6C63FF';
 
@@ -41,7 +41,7 @@ const TagAnalyzerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess, refresh } = usePermissions();
-  const access = getFeatureAccess('tag_analysis');
+  getFeatureAccess('tag_analysis');
 
   const [tags, setTags] = useState('');
   const [results, setResults] = useState([]);

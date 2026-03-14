@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Card, Typography, Row, Col, Statistic, Tag, Space,
-  Empty, theme, Select, Table,
+  Card, Typography, Row, Col, Statistic, Space,
+  theme, Select, Table,
 } from 'antd';
 import {
   EnvironmentOutlined, DollarOutlined, ShoppingOutlined,
-  GlobalOutlined, RiseOutlined, TrophyOutlined,
+  GlobalOutlined, TrophyOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import { useTheme } from '../context/ThemeContext';

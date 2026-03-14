@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Card, Input, Button, Table, Typography, Tag, Progress,
+  Card, Input, Button, Table, Typography, Tag,
   Space, Empty, message, theme, Row, Col, Statistic,
 } from 'antd';
 import {
   OrderedListOutlined, ThunderboltOutlined, RiseOutlined,
-  FallOutlined, MinusOutlined, SearchOutlined,
+  FallOutlined, MinusOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -32,7 +32,7 @@ const BulkRankCheckerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess, refresh } = usePermissions();
-  const access = getFeatureAccess('bulk_rank_check');
+  getFeatureAccess('bulk_rank_check');
 
   const [keywords, setKeywords] = useState('');
   const [results, setResults] = useState([]);

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
-  Card, Typography, Row, Col, Statistic, Table, Tag, Space,
-  Input, Button, Empty, message, theme, Progress, Tooltip,
+  Card, Typography, Row, Col, Statistic, Table, Space,
+  Input, Button, Empty, message, theme, Tooltip,
 } from 'antd';
 import {
   LineChartOutlined, RiseOutlined, FallOutlined, MinusOutlined,
-  ShopOutlined, DollarOutlined, TrophyOutlined, SearchOutlined,
-  PlusOutlined, DeleteOutlined, EyeOutlined,
+  ShopOutlined, TrophyOutlined,
+  PlusOutlined, DeleteOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -42,7 +42,7 @@ const CompetitorSalesPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess, refresh } = usePermissions();
-  const access = getFeatureAccess('competitor_sales');
+  getFeatureAccess('competitor_sales');
 
   const [data, setData] = useState(MOCK_DATA);
   const [shopUrl, setShopUrl] = useState('');
@@ -77,7 +77,6 @@ const CompetitorSalesPage = () => {
   };
 
   const totalDailySales = data.reduce((s, d) => s + d.dailySales, 0);
-  const totalRevenue = data.reduce((s, d) => s + d.revenue, 0);
   const topShop = data.length ? data.reduce((a, b) => a.dailySales > b.dailySales ? a : b) : null;
 
   const columns = [

@@ -6,7 +6,7 @@ import {
 import {
   SearchOutlined, BarChartOutlined, RiseOutlined,
   FallOutlined, MinusOutlined, FireOutlined,
-  ThunderboltOutlined, ArrowLeftOutlined, CopyOutlined,
+  ThunderboltOutlined, CopyOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -62,7 +62,7 @@ const DeepKeywordAnalyzerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess, refresh } = usePermissions();
-  const access = getFeatureAccess('keyword_deep_analysis');
+  getFeatureAccess('keyword_deep_analysis');
 
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
