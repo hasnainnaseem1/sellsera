@@ -242,7 +242,7 @@ const AnalysisDetailPage = () => {
                           <List.Item style={{ padding: '12px 0' }}>
                             <Space direction="vertical" size={2} style={{ width: '100%' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Tag color={item.priority === 'high' ? 'red' : item.priority === 'medium' ? 'gold' : 'blue'}
+                                <Tag color={item.priority === 'high' ? 'red' : item.priority === 'medium' ? 'gold' : 'purple'}
                                   style={{ textTransform: 'capitalize', fontSize: 11 }}>
                                   {item.priority}
                                 </Tag>

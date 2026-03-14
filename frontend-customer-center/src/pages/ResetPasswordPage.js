@@ -56,7 +56,7 @@ const ResetPasswordPage = () => {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
     background: isDark
       ? "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)"
-      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #dbeafe 100%)",
+      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #EDE9FE 100%)",
     padding: "24px", position: "relative",
   };
   const cardStyle = {
@@ -77,7 +77,7 @@ const ResetPasswordPage = () => {
       <div style={cardStyle}>
         {success ? (
           <Result status="success" title="Password reset!" subTitle="You will be redirected to login in 3 seconds"
-            extra={<Link to="/login"><Button type="primary" style={{ background: "linear-gradient(90deg,#6C63FF,#4facfe)", border: "none" }}>Go to Login</Button></Link>} />
+            extra={<Link to="/login"><Button type="primary" style={{ background: "linear-gradient(90deg,#6C63FF,#A78BFA)", border: "none" }}>Go to Login</Button></Link>} />
         ) : (
           <>
             <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -130,7 +130,7 @@ const ResetPasswordPage = () => {
               <Form.Item style={{ marginBottom: 16 }}>
                 <Button type="primary" htmlType="submit" loading={loading} block style={{
                   height: 48, fontWeight: 700, fontSize: 16,
-                  background: "linear-gradient(90deg, #6C63FF, #4facfe)", border: "none",
+                  background: "linear-gradient(90deg, #6C63FF, #A78BFA)", border: "none",
                   boxShadow: "0 4px 16px rgba(108,99,255,0.4)",
                 }}>Reset Password</Button>
               </Form.Item>

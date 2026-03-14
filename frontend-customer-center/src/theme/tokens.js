@@ -6,14 +6,14 @@
 
 export const colors = {
   brand:      '#6C63FF',
-  brandLight: '#4facfe',
+  brandLight: '#A78BFA',
   brandBg:    'rgba(108,99,255,0.08)',
   brandBgDark:'rgba(108,99,255,0.15)',
 
   success:    '#10B981',
   warning:    '#F59E0B',
   danger:     '#EF4444',
-  info:       '#3B82F6',
+  info:       '#818CF8',
   muted:      '#64748B',
 
   darkBg:     '#0D1117',

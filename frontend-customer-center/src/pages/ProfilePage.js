@@ -28,7 +28,7 @@ const getStrength = (pwd) => {
   const map = [
     { label: "Weak",    color: "#ff4d4f", pct: 25  },
     { label: "Fair",    color: "#faad14", pct: 50  },
-    { label: "Good",    color: "#1677ff", pct: 75  },
+    { label: "Good",    color: "#6C63FF", pct: 75  },
     { label: "Strong",  color: "#52c41a", pct: 100 },
   ];
   return { score, ...map[score - 1] || { label: "", color: BRAND, pct: 0 } };
@@ -58,7 +58,7 @@ const ProfilePage = () => {
   };
 
   const gradBtn = {
-    background: "linear-gradient(90deg,#6C63FF,#4facfe)",
+    background: "linear-gradient(90deg,#6C63FF,#A78BFA)",
     border: "none",
     fontWeight: 700,
     height: 44,
@@ -134,7 +134,7 @@ const ProfilePage = () => {
         <Card style={card} styles={{ body: { padding: "28px 32px" } }}>
           {/* Avatar + name header */}
           <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 28 }}>
-            <Avatar size={72} style={{ background: "linear-gradient(135deg,#6C63FF,#4facfe)", fontSize: 28, fontWeight: 700 }}>
+            <Avatar size={72} style={{ background: "linear-gradient(135deg,#6C63FF,#A78BFA)", fontSize: 28, fontWeight: 700 }}>
               {user?.name?.[0]?.toUpperCase() || "U"}
             </Avatar>
             <div>
@@ -257,7 +257,7 @@ const ProfilePage = () => {
       children: (
         <Space direction="vertical" style={{ width: "100%" }} size={20}>
           {/* Plan badge */}
-          <Card style={{ ...card, background: "linear-gradient(135deg,#6C63FF 0%,#4facfe 100%)" }}
+          <Card style={{ ...card, background: "linear-gradient(135deg,#6C63FF 0%,#A78BFA 100%)" }}
             styles={{ body: { padding: "28px 32px" } }}>
             <Row align="middle" justify="space-between">
               <Col>
@@ -287,7 +287,7 @@ const ProfilePage = () => {
                   styles={{ content: { color: BRAND, fontWeight: 700 } }}
                 />
                 <Progress percent={usagePct} showInfo={false}
-                  strokeColor={{ from: BRAND, to: "#4facfe" }} size="small" style={{ marginTop: 8 }} />
+                  strokeColor={{ from: BRAND, to: "#A78BFA" }} size="small" style={{ marginTop: 8 }} />
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {(user?.analysisLimit || 0) - (user?.analysisCount || 0)} remaining
                 </Text>

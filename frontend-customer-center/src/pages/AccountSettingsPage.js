@@ -37,7 +37,7 @@ const getStrength = (pwd) => {
   const map = [
     { label: "Weak", color: "#ff4d4f", pct: 25 },
     { label: "Fair", color: "#faad14", pct: 50 },
-    { label: "Good", color: "#1677ff", pct: 75 },
+    { label: "Good", color: "#6C63FF", pct: 75 },
     { label: "Strong", color: "#52c41a", pct: 100 },
   ];
   return { score, ...(map[score - 1] || { label: "", color: BRAND, pct: 0 }) };
@@ -46,11 +46,11 @@ const getStrength = (pwd) => {
 const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A";
 
-const statusColors = { active: "green", trial: "blue", expired: "red", cancelled: "orange", past_due: "volcano", inactive: "default", none: "default" };
+const statusColors = { active: "green", trial: 'purple', expired: "red", cancelled: "orange", past_due: "volcano", inactive: "default", none: "default" };
 const statusIcons = { active: <CheckCircleOutlined />, trial: <ClockCircleOutlined />, expired: <ExclamationCircleOutlined />, cancelled: <ExclamationCircleOutlined />, past_due: <ExclamationCircleOutlined /> };
 const paymentStatusConfig = {
   succeeded: { color: "green", icon: <CheckCircleOutlined />, label: "Paid" },
-  pending: { color: "blue", icon: <ClockCircleOutlined />, label: "Pending" },
+  pending: { color: "purple", icon: <ClockCircleOutlined />, label: "Pending" },
   failed: { color: "red", icon: <CloseCircleOutlined />, label: "Failed" },
   refunded: { color: "orange", icon: <DollarOutlined />, label: "Refunded" },
   cancelled: { color: "default", icon: <CloseCircleOutlined />, label: "Cancelled" },
@@ -79,7 +79,7 @@ const AccountSettingsPage = () => {
   };
 
   const gradBtn = {
-    background: "linear-gradient(90deg,#6C63FF,#4facfe)",
+    background: "linear-gradient(90deg,#6C63FF,#A78BFA)",
     border: "none",
     fontWeight: 700,
     height: 44,
@@ -169,7 +169,7 @@ const ProfileTab = ({ card, gradBtn, tok, isDark, user, token, updateUser }) => 
     <Card style={card} styles={{ body: { padding: "32px 36px" } }}>
       {/* Avatar header */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 32 }}>
-        <Avatar size={72} style={{ background: "linear-gradient(135deg,#6C63FF,#4facfe)", fontSize: 28, fontWeight: 700, flexShrink: 0 }}>
+        <Avatar size={72} style={{ background: "linear-gradient(135deg,#6C63FF,#A78BFA)", fontSize: 28, fontWeight: 700, flexShrink: 0 }}>
           {user?.name?.[0]?.toUpperCase() || "U"}
         </Avatar>
         <div>
@@ -179,7 +179,7 @@ const ProfileTab = ({ card, gradBtn, tok, isDark, user, token, updateUser }) => 
             <Tag color={user?.isEmailVerified ? "success" : "warning"} icon={user?.isEmailVerified ? <CheckCircleOutlined /> : <MailOutlined />}>
               {user?.isEmailVerified ? "Verified" : "Unverified"}
             </Tag>
-            <Tag color="blue">{user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : "Free"} Plan</Tag>
+            <Tag color="purple">{user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : "Free"} Plan</Tag>
           </div>
         </div>
       </div>
@@ -412,7 +412,7 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
       )}
 
       {/* Plan Card */}
-      <Card style={{ ...card, background: `linear-gradient(135deg, ${BRAND} 0%, #4facfe 100%)`, marginBottom: 24 }}
+      <Card style={{ ...card, background: `linear-gradient(135deg, ${BRAND} 0%, #A78BFA 100%)`, marginBottom: 24 }}
         styles={{ body: { padding: 28 } }}>
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} md={14}>
@@ -483,7 +483,7 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
               value={user?.analysisCount || 0} suffix={<Text type="secondary">/ {user?.analysisLimit || 0}</Text>}
               prefix={<ThunderboltOutlined style={{ color: BRAND }} />} styles={{ content: { color: BRAND, fontWeight: 700 } }} />
             <Progress percent={Math.min(usagePct, 100)} showInfo={false}
-              strokeColor={usagePct >= 90 ? "#ff4d4f" : { from: BRAND, to: "#4facfe" }} size="small" style={{ marginTop: 10 }} />
+              strokeColor={usagePct >= 90 ? "#ff4d4f" : { from: BRAND, to: "#A78BFA" }} size="small" style={{ marginTop: 10 }} />
           </Card>
         </Col>
         <Col xs={24} md={12}>
@@ -508,7 +508,7 @@ const SubscriptionTab = ({ card, tok, isDark, user, token, fetchMe, onChangeTab 
                   <CheckCircleOutlined style={{ color: f.enabled ? "#52c41a" : "#d9d9d9" }} />
                   <Text style={{ flex: 1 }}>{f.featureName || f.featureKey}</Text>
                   {f.limit !== null && f.limit !== undefined && (
-                    <Tag color="blue">{f.limit === -1 ? "Unlimited" : f.limit}</Tag>
+                    <Tag color="purple">{f.limit === -1 ? "Unlimited" : f.limit}</Tag>
                   )}
                 </div>
               </Col>
@@ -591,7 +591,7 @@ const PlansTab = ({ card, tok, isDark, token }) => {
                   style={{
                     ...card,
                     ...(isCurrent ? { borderColor: BRAND, borderWidth: 2 } : {}),
-                    ...(isPopular ? { background: `linear-gradient(135deg, ${BRAND} 0%, #4facfe 100%)` } : {}),
+                    ...(isPopular ? { background: `linear-gradient(135deg, ${BRAND} 0%, #A78BFA 100%)` } : {}),
                     height: "100%",
                   }}
                   styles={{ body: { padding: "28px 24px", display: "flex", flexDirection: "column", height: "100%" } }}>
@@ -610,7 +610,7 @@ const PlansTab = ({ card, tok, isDark, token }) => {
                     )}
                   </div>
                   {plan.trialDays > 0 && !isCurrent && (
-                    <Tag color="blue" style={{ marginBottom: 12, alignSelf: "flex-start" }}>{plan.trialDays}-day free trial</Tag>
+                    <Tag color="purple" style={{ marginBottom: 12, alignSelf: "flex-start" }}>{plan.trialDays}-day free trial</Tag>
                   )}
                   <div style={{ flex: 1, marginBottom: 20 }}>
                     <List size="small" dataSource={plan.features || []}

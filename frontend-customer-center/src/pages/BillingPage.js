@@ -18,7 +18,7 @@ const BRAND = '#6C63FF';
 
 const statusConfig = {
   succeeded: { color: 'green', icon: <CheckCircleOutlined />, label: 'Paid' },
-  pending: { color: 'blue', icon: <ClockCircleOutlined />, label: 'Pending' },
+  pending: { color: 'purple', icon: <ClockCircleOutlined />, label: 'Pending' },
   failed: { color: 'red', icon: <CloseCircleOutlined />, label: 'Failed' },
   refunded: { color: 'orange', icon: <DollarOutlined />, label: 'Refunded' },
   cancelled: { color: 'default', icon: <CloseCircleOutlined />, label: 'Cancelled' },

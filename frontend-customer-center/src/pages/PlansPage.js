@@ -143,7 +143,7 @@ const PlansPage = () => {
                       ...card,
                       ...(isCurrent ? { borderColor: BRAND, borderWidth: 2 } : {}),
                       ...(isPopular ? {
-                        background: `linear-gradient(135deg, ${BRAND} 0%, #4facfe 100%)`,
+                        background: `linear-gradient(135deg, ${BRAND} 0%, #A78BFA 100%)`,
                       } : {}),
                       height: '100%',
                     }}
@@ -189,7 +189,7 @@ const PlansPage = () => {
 
                     {/* Trial info */}
                     {plan.trialDays > 0 && !isCurrent && (
-                      <Tag color="blue" style={{ marginBottom: 12, alignSelf: 'flex-start' }}>
+                      <Tag color="purple" style={{ marginBottom: 12, alignSelf: 'flex-start' }}>
                         {plan.trialDays}-day free trial
                       </Tag>
                     )}

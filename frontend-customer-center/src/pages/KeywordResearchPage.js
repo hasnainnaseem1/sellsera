@@ -89,7 +89,7 @@ const KeywordResearchPage = () => {
       width: 130,
       align: 'right',
       sorter: (a, b) => a.searches - b.searches,
-      render: (v) => <Tag color="blue" style={{ fontWeight: 600 }}>{v.toLocaleString()}</Tag>,
+      render: (v) => <Tag color="purple" style={{ fontWeight: 600 }}>{v.toLocaleString()}</Tag>,
     },
     {
       title: 'Avg. Clicks',

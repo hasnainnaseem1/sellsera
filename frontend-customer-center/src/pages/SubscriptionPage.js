@@ -20,7 +20,7 @@ const BRAND = '#6C63FF';
 
 const statusColors = {
   active: 'green',
-  trial: 'blue',
+  trial: 'purple',
   expired: 'red',
   cancelled: 'orange',
   past_due: 'volcano',
@@ -226,7 +226,7 @@ const SubscriptionPage = () => {
         <Card
           style={{
             ...card,
-            background: `linear-gradient(135deg, ${BRAND} 0%, #4facfe 100%)`,
+            background: `linear-gradient(135deg, ${BRAND} 0%, #A78BFA 100%)`,
             marginBottom: 24,
           }}
           styles={{ body: { padding: 28 } }}
@@ -358,7 +358,7 @@ const SubscriptionPage = () => {
               <Progress
                 percent={Math.min(usagePct, 100)}
                 showInfo={false}
-                strokeColor={usagePct >= 90 ? '#ff4d4f' : { from: BRAND, to: '#4facfe' }}
+                strokeColor={usagePct >= 90 ? '#ff4d4f' : { from: BRAND, to: '#A78BFA' }}
                 size="small"
                 style={{ marginTop: 10 }}
               />
@@ -424,7 +424,7 @@ const SubscriptionPage = () => {
                     <CheckCircleOutlined style={{ color: f.enabled ? '#52c41a' : '#d9d9d9' }} />
                     <Text style={{ flex: 1 }}>{f.featureName || f.featureKey}</Text>
                     {f.limit !== null && f.limit !== undefined && (
-                      <Tag color="blue">{f.limit === -1 ? 'Unlimited' : f.limit}</Tag>
+                      <Tag color="purple">{f.limit === -1 ? 'Unlimited' : f.limit}</Tag>
                     )}
                   </div>
                 </Col>

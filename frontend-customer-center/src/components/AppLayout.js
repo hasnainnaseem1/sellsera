@@ -21,7 +21,7 @@ const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
 const BRAND   = '#6C63FF';
-const BRAND2  = '#4facfe';
+const BRAND2  = '#A78BFA';
 
 const AppLayout = ({ children }) => {
   const navigate       = useNavigate();

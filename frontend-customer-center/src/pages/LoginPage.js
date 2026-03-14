@@ -123,7 +123,7 @@ const LoginPage = () => {
     justifyContent: 'center',
     background:  isDark
       ? 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)'
-      : 'linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #dbeafe 100%)',
+      : 'linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #EDE9FE 100%)',
     padding:     '24px',
     position:    'relative',
   };
@@ -175,7 +175,7 @@ const LoginPage = () => {
             <div style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: 56, height: 56, borderRadius: 16, marginBottom: 12,
-              background: 'linear-gradient(135deg, #6C63FF, #4facfe)',
+              background: 'linear-gradient(135deg, #6C63FF, #A78BFA)',
               boxShadow: '0 8px 24px rgba(108,99,255,0.4)',
             }}>
               <span style={{ color: '#fff', fontWeight: 900, fontSize: 22 }}>
@@ -253,7 +253,7 @@ const LoginPage = () => {
               block
               style={{
                 height: 48, fontWeight: 700, fontSize: 16,
-                background: loginDisabled ? undefined : 'linear-gradient(90deg, #6C63FF, #4facfe)',
+                background: loginDisabled ? undefined : 'linear-gradient(90deg, #6C63FF, #A78BFA)',
                 border: 'none',
                 boxShadow: loginDisabled ? undefined : '0 4px 16px rgba(108,99,255,0.4)',
               }}

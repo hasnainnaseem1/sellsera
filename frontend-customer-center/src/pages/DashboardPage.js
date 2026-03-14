@@ -118,7 +118,7 @@ const DashboardPage = () => {
       <Card
         style={{
           ...card,
-          background: `linear-gradient(135deg, ${BRAND} 0%, #4facfe 100%)`,
+          background: `linear-gradient(135deg, ${BRAND} 0%, #A78BFA 100%)`,
           marginBottom: 24,
         }}
         styles={{ body: { padding: "24px 28px" } }}
@@ -135,7 +135,7 @@ const DashboardPage = () => {
               <Tag
                 color={
                   subStatus === "active" ? "green"
-                    : subStatus === "trial" ? "blue"
+                    : subStatus === "trial" ? "purple"
                       : subStatus === "cancelled" ? "orange"
                         : subStatus === "expired" ? "red"
                           : "default"
@@ -202,7 +202,7 @@ const DashboardPage = () => {
             <Progress
               percent={Math.min(usagePct, 100)}
               showInfo={false}
-              strokeColor={usagePct >= 90 ? "#ff4d4f" : { from: BRAND, to: "#4facfe" }}
+              strokeColor={usagePct >= 90 ? "#ff4d4f" : { from: BRAND, to: "#A78BFA" }}
               size="small" style={{ marginTop: 8 }}
             />
           </Card>
@@ -354,7 +354,7 @@ const DashboardPage = () => {
                   <Space direction="vertical" size={8} style={{ textAlign: 'center' }}>
                     <Text type="secondary">No analyses yet</Text>
                     <Button type="primary" icon={<ThunderboltOutlined />} onClick={() => navigate('/audit')}
-                      style={{ background: `linear-gradient(135deg, ${BRAND}, #4facfe)`, border: 'none' }}>
+                      style={{ background: `linear-gradient(135deg, ${BRAND}, #A78BFA)`, border: 'none' }}>
                       Run Your First Audit
                     </Button>
                   </Space>

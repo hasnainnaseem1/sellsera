@@ -39,7 +39,7 @@ const ForgotPasswordPage = () => {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
     background: isDark
       ? "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)"
-      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #dbeafe 100%)",
+      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #EDE9FE 100%)",
     padding: "24px", position: "relative",
   };
   const cardStyle = {
@@ -63,7 +63,7 @@ const ForgotPasswordPage = () => {
             status="success"
             title="Check your inbox!"
             subTitle="If an account with that email exists, we have sent a password reset link. Check your spam folder too."
-            extra={<Link to="/login"><Button type="primary" style={{ background: "linear-gradient(90deg,#6C63FF,#4facfe)", border: "none" }}>Back to Login</Button></Link>}
+            extra={<Link to="/login"><Button type="primary" style={{ background: "linear-gradient(90deg,#6C63FF,#A78BFA)", border: "none" }}>Back to Login</Button></Link>}
           />
         ) : (
           <>
@@ -71,7 +71,7 @@ const ForgotPasswordPage = () => {
               <div style={{
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 width: 56, height: 56, borderRadius: 16, marginBottom: 12,
-                background: "linear-gradient(135deg, #6C63FF, #4facfe)", boxShadow: "0 8px 24px rgba(108,99,255,0.4)",
+                background: "linear-gradient(135deg, #6C63FF, #A78BFA)", boxShadow: "0 8px 24px rgba(108,99,255,0.4)",
               }}>
                 <span style={{ color: "#fff", fontWeight: 900, fontSize: 22 }}>{branding.siteName.charAt(0).toUpperCase()}</span>
               </div>
@@ -89,7 +89,7 @@ const ForgotPasswordPage = () => {
               <Form.Item style={{ marginBottom: 16 }}>
                 <Button type="primary" htmlType="submit" loading={loading} block style={{
                   height: 48, fontWeight: 700, fontSize: 16,
-                  background: "linear-gradient(90deg, #6C63FF, #4facfe)", border: "none",
+                  background: "linear-gradient(90deg, #6C63FF, #A78BFA)", border: "none",
                   boxShadow: "0 4px 16px rgba(108,99,255,0.4)",
                 }}>Send Reset Link</Button>
               </Form.Item>

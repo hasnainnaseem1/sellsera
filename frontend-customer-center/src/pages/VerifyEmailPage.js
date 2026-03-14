@@ -42,7 +42,7 @@ const ResendForm = ({ tok }) => {
         ✅ Good news! Your email is already verified.
       </Text>
       <Button type="primary" href="/login"
-        style={{ background: "linear-gradient(90deg,#6C63FF,#4facfe)", border: "none", fontWeight: 600 }}>
+        style={{ background: "linear-gradient(90deg,#6C63FF,#A78BFA)", border: "none", fontWeight: 600 }}>
         Go to Login
       </Button>
     </div>
@@ -58,7 +58,7 @@ const ResendForm = ({ tok }) => {
       />
       <Button
         type="primary" onClick={handleResend} loading={sending}
-        style={{ background: "linear-gradient(90deg,#6C63FF,#4facfe)", border: "none", fontWeight: 600 }}
+        style={{ background: "linear-gradient(90deg,#6C63FF,#A78BFA)", border: "none", fontWeight: 600 }}
       >
         Resend Link
       </Button>
@@ -100,7 +100,7 @@ const VerifyEmailPage = () => {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
     background: isDark
       ? "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)"
-      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #dbeafe 100%)",
+      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #EDE9FE 100%)",
     padding: "24px", position: "relative",
   };
   const cardStyle = {
@@ -129,7 +129,7 @@ const VerifyEmailPage = () => {
         )}
         {status === "success" && (
           <Result status="success" title="Email Verified!" subTitle={`${message} Redirecting to login in 3 seconds`}
-            extra={<Button type="primary" onClick={() => navigate("/login")} style={{ background: "linear-gradient(90deg,#6C63FF,#4facfe)", border: "none" }}>Go to Login</Button>} />
+            extra={<Button type="primary" onClick={() => navigate("/login")} style={{ background: "linear-gradient(90deg,#6C63FF,#A78BFA)", border: "none" }}>Go to Login</Button>} />
         )}
         {status === "error" && (
           <>

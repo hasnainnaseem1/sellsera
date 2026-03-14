@@ -34,7 +34,7 @@ const VerifyEmailSentPage = () => {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
     background: isDark
       ? "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)"
-      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #dbeafe 100%)",
+      : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #EDE9FE 100%)",
     padding: "24px", position: "relative",
   };
   const cardStyle = {
@@ -57,7 +57,7 @@ const VerifyEmailSentPage = () => {
         <div style={{
           display: "inline-flex", alignItems: "center", justifyContent: "center",
           width: 72, height: 72, borderRadius: "50%", marginBottom: 20,
-          background: "linear-gradient(135deg, #6C63FF, #4facfe)", boxShadow: "0 8px 24px rgba(108,99,255,0.4)",
+          background: "linear-gradient(135deg, #6C63FF, #A78BFA)", boxShadow: "0 8px 24px rgba(108,99,255,0.4)",
         }}>
           <MailOutlined style={{ color: "#fff", fontSize: 30 }} />
         </div>
@@ -87,7 +87,7 @@ const VerifyEmailSentPage = () => {
 
         <Button
           type="primary" onClick={handleResend} loading={resending} disabled={!email || resendStatus === "success"} block
-          style={{ height: 46, fontWeight: 600, background: "linear-gradient(90deg,#6C63FF,#4facfe)", border: "none", marginBottom: 16 }}
+          style={{ height: 46, fontWeight: 600, background: "linear-gradient(90deg,#6C63FF,#A78BFA)", border: "none", marginBottom: 16 }}
         >
           Resend verification email
         </Button>
