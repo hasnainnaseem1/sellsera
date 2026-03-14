@@ -46,7 +46,7 @@ const AppLayout = ({ children }) => {
   const usagePill = (featureKey) => {
     if (collapsed) return null;
     const a = getFeatureAccess(featureKey);
-    if (a.state === 'locked') return <LockOutlined style={{ fontSize: 11, color: colors.muted }} />;
+    if (a.state === 'locked') return <LockOutlined style={{ fontSize: 11, marginLeft: 8, color: BRAND, opacity: 0.7 }} />;
     if (a.unlimited || !a.limit) return null;
     const pct = (a.used / a.limit) * 100;
     const pillColor = pct >= 90 ? colors.danger : pct >= 60 ? colors.warning : colors.success;
@@ -64,10 +64,10 @@ const AppLayout = ({ children }) => {
 
   /* ── SEO Tools section ── */
   const seoToolItems = [
-    { key: '/audit',       icon: <SearchOutlined />,  label: <span style={{ display: 'flex', alignItems: 'center' }}>Listing Audit{usagePill('listing_audit')}</span> },
+    { key: '/audit',       icon: <SearchOutlined />,  label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>Listing Audit{usagePill('listing_audit')}</span> },
     { key: '/history',     icon: <HistoryOutlined />,  label: 'Analysis History' },
-    { key: '/keywords',    icon: <KeyOutlined />,     label: <span style={{ display: 'flex', alignItems: 'center' }}>Keywords{usagePill('keyword_search')}</span> },
-    { key: '/competitors', icon: <TeamOutlined />,    label: <span style={{ display: 'flex', alignItems: 'center' }}>Competitors{usagePill('competitor_tracking')}</span> },
+    { key: '/keywords',    icon: <KeyOutlined />,     label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>Keywords{usagePill('keyword_search')}</span> },
+    { key: '/competitors', icon: <TeamOutlined />,    label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>Competitors{usagePill('competitor_tracking')}</span> },
   ];
 
   /* ── Account menu (bottom section — user/account related) ── */
