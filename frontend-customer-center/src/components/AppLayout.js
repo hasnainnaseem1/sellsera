@@ -2,17 +2,20 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import {
-  Layout, Menu, Avatar, Dropdown, Button, Typography, Tooltip, Divider
+  Layout, Menu, Avatar, Dropdown, Button, Typography, Tooltip, Divider, Tag
 } from 'antd';
 import {
   DashboardOutlined,
   LogoutOutlined, MoonOutlined, SunOutlined, MenuFoldOutlined,
   MenuUnfoldOutlined, QuestionCircleOutlined, RocketOutlined,
-  SettingOutlined
+  SettingOutlined, SearchOutlined, HistoryOutlined,
+  KeyOutlined, TeamOutlined, LockOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSite } from '../context/SiteContext';
+import { usePermissions } from '../context/PermissionsContext';
+import { colors } from '../theme/tokens';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -26,6 +29,7 @@ const AppLayout = ({ children }) => {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const { siteConfig } = useSite();
+  const { getFeatureAccess } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
   const handleLogout = useCallback(async () => {
@@ -38,10 +42,32 @@ const AppLayout = ({ children }) => {
     navigate('/login', { replace: true });
   }, [logout, navigate]);
 
+  /* ── helper: compact usage pill for sidebar ── */
+  const usagePill = (featureKey) => {
+    if (collapsed) return null;
+    const a = getFeatureAccess(featureKey);
+    if (a.state === 'locked') return <LockOutlined style={{ fontSize: 11, color: colors.muted }} />;
+    if (a.unlimited || !a.limit) return null;
+    const pct = (a.used / a.limit) * 100;
+    const pillColor = pct >= 90 ? colors.danger : pct >= 60 ? colors.warning : colors.success;
+    return (
+      <Tag style={{ fontSize: 10, lineHeight: '18px', padding: '0 6px', borderRadius: 99, fontWeight: 600, border: 'none', background: `${pillColor}18`, color: pillColor, marginLeft: 'auto' }}>
+        {a.used}/{a.limit}
+      </Tag>
+    );
+  };
+
   /* ── Feature menu (top section — main product features) ── */
   const featureItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
-    // Future feature pages will be added here
+  ];
+
+  /* ── SEO Tools section ── */
+  const seoToolItems = [
+    { key: '/audit',       icon: <SearchOutlined />,  label: <span style={{ display: 'flex', alignItems: 'center' }}>Listing Audit{usagePill('listing_audit')}</span> },
+    { key: '/history',     icon: <HistoryOutlined />,  label: 'Analysis History' },
+    { key: '/keywords',    icon: <KeyOutlined />,     label: <span style={{ display: 'flex', alignItems: 'center' }}>Keywords{usagePill('keyword_search')}</span> },
+    { key: '/competitors', icon: <TeamOutlined />,    label: <span style={{ display: 'flex', alignItems: 'center' }}>Competitors{usagePill('competitor_tracking')}</span> },
   ];
 
   /* ── Account menu (bottom section — user/account related) ── */
@@ -176,6 +202,16 @@ const AppLayout = ({ children }) => {
             mode="inline"
             selectedKeys={[location.pathname]}
             items={featureItems}
+            onClick={({ key }) => navigate(key)}
+            style={{ background: 'transparent', border: 'none', fontSize: 14 }}
+            theme={isDark ? 'dark' : 'light'}
+          />
+
+          {sectionLabel('SEO Tools')}
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={seoToolItems}
             onClick={({ key }) => navigate(key)}
             style={{ background: 'transparent', border: 'none', fontSize: 14 }}
             theme={isDark ? 'dark' : 'light'}

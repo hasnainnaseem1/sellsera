@@ -21,6 +21,12 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
 import AccountSettingsPage from './pages/AccountSettingsPage';
+import ListingAuditPage from './pages/ListingAuditPage';
+import AnalysisDetailPage from './pages/AnalysisDetailPage';
+import HistoryPage from './pages/HistoryPage';
+import KeywordResearchPage from './pages/KeywordResearchPage';
+import CompetitorTrackerPage from './pages/CompetitorTrackerPage';
+import { PermissionsProvider } from './context/PermissionsContext';
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 const BRAND_PRIMARY = '#6C63FF';
@@ -111,8 +117,13 @@ const AppWithTheme = () => {
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
           {/* Protected App Routes */}
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/settings"  element={<ProtectedRoute><AccountSettingsPage /></ProtectedRoute>} />
+          <Route path="/dashboard"    element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+          <Route path="/settings"     element={<ProtectedRoute><AccountSettingsPage /></ProtectedRoute>} />
+          <Route path="/audit"        element={<ProtectedRoute><ListingAuditPage /></ProtectedRoute>} />
+          <Route path="/history"      element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+          <Route path="/history/:id"  element={<ProtectedRoute><AnalysisDetailPage /></ProtectedRoute>} />
+          <Route path="/keywords"     element={<ProtectedRoute><KeywordResearchPage /></ProtectedRoute>} />
+          <Route path="/competitors"  element={<ProtectedRoute><CompetitorTrackerPage /></ProtectedRoute>} />
 
           {/* Legacy redirects → Settings tabs */}
           <Route path="/profile"       element={<Navigate to="/settings?tab=profile" replace />} />
@@ -138,7 +149,9 @@ function App() {
     <SiteProvider>
       <ThemeProvider>
         <AuthProvider>
-          <AppWithTheme />
+          <PermissionsProvider>
+            <AppWithTheme />
+          </PermissionsProvider>
         </AuthProvider>
       </ThemeProvider>
     </SiteProvider>
