@@ -84,6 +84,11 @@ router.delete('/email-blocking/domains/:domain', checkPermission('settings.edit'
 // @access  Private (Super Admin only)
 router.put('/google-sso', checkPermission('settings.edit'), settingsController.updateGoogleSSO);
 
+// @route   PUT /api/v1/admin/settings/etsy
+// @desc    Update Etsy OAuth integration settings
+// @access  Private (Super Admin only)
+router.put('/etsy', checkPermission('settings.edit'), settingsController.updateEtsySettings);
+
 // @route   PUT /api/v1/admin/settings/stripe
 // @desc    Update Stripe integration settings
 // @access  Private (Super Admin only)

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const app = require('./app');
 const { initializeJobs } = require('./jobs');
+const { initEncryptionKey } = require('./utils/encryption');
 require('dotenv').config();
 
 // ==========================================
@@ -51,6 +52,9 @@ const startServer = async () => {
 
   // Connect to database first
   await connectDB();
+
+  // Load encryption key from DB (falls back to env var)
+  await initEncryptionKey();
   
   // Start Express server
   app.listen(PORT, () => {

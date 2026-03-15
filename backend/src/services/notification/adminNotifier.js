@@ -312,10 +312,42 @@ async function notifyCustomerStatusChange({ customer, oldStatus, newStatus, chan
   }
 }
 
+/**
+ * Generic system alert to all admins (e.g., API key disabled, cron failure).
+ *
+ * @param {Object} opts
+ * @param {string} opts.title    - Alert title
+ * @param {string} opts.message  - Alert body
+ * @param {string} [opts.priority] - 'low' | 'medium' | 'high'
+ * @param {Object} [opts.metadata] - Extra data
+ */
+async function notifySystemAlert({ title, message: msg, priority = 'medium', metadata = {} }) {
+  try {
+    const ns = await getNotificationSettings();
+    const admins = await getAdminIds();
+
+    await _notifyAdmins(admins, {
+      type: 'system_alert',
+      title,
+      message: msg,
+      priority,
+      metadata,
+      emailSubject: `[Sellsera Alert] ${title}`,
+      emailHtml: `<h3>${title}</h3><p>${msg}</p>`,
+      emailText: `${title}: ${msg}`,
+    }, ns);
+
+    console.log(`[AdminNotifier] System alert sent to ${admins.length} admin(s): ${title}`);
+  } catch (err) {
+    console.error('[AdminNotifier] notifySystemAlert error:', err.message);
+  }
+}
+
 module.exports = {
   notifyNewCustomer,
   notifySubscriptionChange,
   notifyPasswordResetRequest,
   notifyCustomerPasswordReset,
   notifyCustomerStatusChange,
+  notifySystemAlert,
 };

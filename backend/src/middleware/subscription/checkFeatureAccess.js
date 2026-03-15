@@ -89,17 +89,25 @@ const checkFeatureAccess = (featureKey) => {
       }
 
       // Numeric feature — check usage against limit
-      // Count usage for current billing period (since monthlyResetDate was last reset)
-      const periodStart = user.monthlyResetDate
-        ? new Date(new Date(user.monthlyResetDate).getTime() - 30 * 24 * 60 * 60 * 1000) // start of current period
-        : new Date(new Date().getFullYear(), new Date().getMonth(), 1); // fallback: first of current month
+      // Determine if this is a lifetime or monthly feature
+      const isLifetime = feature.periodType === 'lifetime';
 
-      const usageCount = await UsageLog.countDocuments({
+      let usageQuery = {
         userId: user._id,
         featureKey,
         action: 'used',
-        createdAt: { $gte: periodStart },
-      });
+      };
+
+      if (!isLifetime) {
+        // Monthly: count usage for current billing period
+        const periodStart = user.monthlyResetDate
+          ? new Date(new Date(user.monthlyResetDate).getTime() - 30 * 24 * 60 * 60 * 1000)
+          : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        usageQuery.createdAt = { $gte: periodStart };
+      }
+      // Lifetime: no date filter — counts all-time usage
+
+      const usageCount = await UsageLog.countDocuments(usageQuery);
 
       const remaining = Math.max(0, feature.limit - usageCount);
 
@@ -119,7 +127,9 @@ const checkFeatureAccess = (featureKey) => {
         return res.status(429).json({
           success: false,
           code: 'FEATURE_LIMIT_REACHED',
-          message: `You've reached the limit for "${feature.featureName}". Used ${usageCount}/${feature.limit} this month. Please upgrade your plan for more.`,
+          message: isLifetime
+            ? `You've used your lifetime allowance for "${feature.featureName}" (${usageCount}/${feature.limit}). Upgrade your plan for more.`
+            : `You've reached the limit for "${feature.featureName}". Used ${usageCount}/${feature.limit} this month. Please upgrade your plan for more.`,
           featureKey,
           featureName: feature.featureName,
           used: usageCount,

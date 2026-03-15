@@ -15,41 +15,11 @@ import UsageBadge from '../components/common/UsageBadge';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text, Paragraph } = Typography;
 
 const BRAND = '#6C63FF';
-
-/* ── Mock deep analysis result ── */
-const MOCK_RESULT = {
-  keyword: 'handmade ceramic mug',
-  volume: 48200,
-  competition: 67,
-  avgPrice: 32.5,
-  totalListings: 12840,
-  ctr: '68%',
-  seasonality: 'year-round',
-  trend: 'rising',
-  trendPct: 14,
-  monthlyData: [
-    { month: 'Sep', vol: 38000 }, { month: 'Oct', vol: 42000 }, { month: 'Nov', vol: 56000 },
-    { month: 'Dec', vol: 71000 }, { month: 'Jan', vol: 44000 }, { month: 'Feb', vol: 41000 },
-    { month: 'Mar', vol: 48200 },
-  ],
-  relatedKeywords: [
-    { kw: 'ceramic coffee mug', vol: 33100, comp: 58, trend: 'up' },
-    { kw: 'pottery mug handmade', vol: 21400, comp: 42, trend: 'up' },
-    { kw: 'custom mug gift', vol: 19800, comp: 71, trend: 'stable' },
-    { kw: 'unique mug for her', vol: 15200, comp: 55, trend: 'up' },
-    { kw: 'artisan cup', vol: 8900, comp: 29, trend: 'rising' },
-    { kw: 'stoneware mug', vol: 12600, comp: 44, trend: 'stable' },
-  ],
-  suggestedTags: [
-    'handmade mug', 'ceramic mug', 'pottery mug', 'coffee mug', 'mug gift',
-    'unique mug', 'artisan mug', 'custom mug', 'stoneware mug', 'tea mug',
-    'handcrafted mug', 'gift for her', 'housewarming gift',
-  ],
-};
 
 const compColor = (c) => (c >= 70 ? colors.danger : c >= 40 ? colors.warning : colors.success);
 const trendIcon = (t) => {
@@ -77,11 +47,30 @@ const DeepKeywordAnalyzerPage = () => {
   const handleAnalyze = async () => {
     if (!keyword.trim()) { message.warning('Enter a keyword to analyze'); return; }
     setLoading(true);
-    // Simulate API — will be replaced with real endpoint
-    await new Promise(r => setTimeout(r, 1500));
-    setResult({ ...MOCK_RESULT, keyword: keyword.trim() });
-    setLoading(false);
-    refresh();
+    try {
+      const res = await etsyApi.deepAnalysis({ keyword: keyword.trim() });
+      const d = res.data || res;
+      setResult({
+        keyword: keyword.trim(),
+        volume: d.volume || 0,
+        competition: d.competition || 0,
+        avgPrice: d.avgPrice || 0,
+        totalListings: d.totalListings || 0,
+        ctr: d.ctr || '—',
+        seasonality: d.seasonality || '—',
+        trend: d.trend || 'stable',
+        trendPct: d.trendPct || 0,
+        monthlyData: d.monthlyData || [],
+        relatedKeywords: d.relatedKeywords || [],
+        suggestedTags: d.suggestedTags || [],
+      });
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Deep analysis failed');
+      setResult(null);
+    } finally {
+      setLoading(false);
+      refresh();
+    }
   };
 
   const copyTags = () => {

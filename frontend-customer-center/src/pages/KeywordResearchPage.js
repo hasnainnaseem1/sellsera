@@ -13,6 +13,7 @@ import UsageBadge from '../components/common/UsageBadge';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 
@@ -23,18 +24,6 @@ const COUNTRIES = [
   { value: 'AU', label: '🇦🇺 Australia' },
   { value: 'DE', label: '🇩🇪 Germany' },
   { value: 'FR', label: '🇫🇷 France' },
-];
-
-// Mock keyword data for demonstration
-const MOCK_KEYWORDS = [
-  { keyword: 'handmade jewelry', searches: 74200, clicks: 52340, ctr: '71%', competition: 85, trend: 'up' },
-  { keyword: 'custom necklace', searches: 41500, clicks: 28200, ctr: '68%', competition: 72, trend: 'up' },
-  { keyword: 'personalized gift', searches: 89100, clicks: 61000, ctr: '69%', competition: 91, trend: 'stable' },
-  { keyword: 'unique earrings', searches: 33800, clicks: 22100, ctr: '65%', competition: 58, trend: 'up' },
-  { keyword: 'boho bracelet', searches: 18400, clicks: 11200, ctr: '61%', competition: 44, trend: 'down' },
-  { keyword: 'minimalist ring', searches: 28900, clicks: 19800, ctr: '69%', competition: 63, trend: 'up' },
-  { keyword: 'vintage brooch', searches: 12600, clicks: 8100, ctr: '64%', competition: 31, trend: 'stable' },
-  { keyword: 'crystal pendant', searches: 21300, clicks: 14500, ctr: '68%', competition: 52, trend: 'up' },
 ];
 
 const compColor = (comp) => {
@@ -65,14 +54,26 @@ const KeywordResearchPage = () => {
     if (!keyword.trim()) { message.warning('Enter a keyword to search'); return; }
     setLoading(true);
     setSearched(true);
-    // Simulate API delay — will be replaced with real endpoint
-    await new Promise(r => setTimeout(r, 1200));
-    setResults(MOCK_KEYWORDS.map((k, i) => ({
-      ...k,
-      key: i,
-      keyword: i === 0 ? keyword.trim() : k.keyword,
-    })));
-    setLoading(false);
+    try {
+      const res = await etsyApi.searchKeywords({ keyword: keyword.trim(), country });
+      const rows = (res.data?.results || res.results || []).map((k, i) => ({
+        key: i,
+        keyword: k.keyword || k.query || keyword.trim(),
+        searches: k.searches || k.volume || 0,
+        clicks: k.clicks || 0,
+        ctr: k.ctr || '—',
+        competition: k.competition || 0,
+        trend: k.trend || 'stable',
+      }));
+      setResults(rows);
+      if (!rows.length) message.info('No keyword data found');
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Search failed — is your Etsy shop connected?';
+      message.error(msg);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const columns = [

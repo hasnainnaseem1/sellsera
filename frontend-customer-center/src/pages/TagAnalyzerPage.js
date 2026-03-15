@@ -15,20 +15,11 @@ import UsageBadge from '../components/common/UsageBadge';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 const BRAND = '#6C63FF';
-
-const MOCK_ANALYSIS = [
-  { key: 1, tag: 'handmade jewelry', score: 92, volume: 74200, competition: 85, status: 'excellent' },
-  { key: 2, tag: 'custom necklace', score: 78, volume: 41500, competition: 72, status: 'good' },
-  { key: 3, tag: 'gift for her', score: 65, volume: 89100, competition: 91, status: 'fair' },
-  { key: 4, tag: 'unique earrings', score: 84, volume: 33800, competition: 58, status: 'good' },
-  { key: 5, tag: 'boho bracelet', score: 45, volume: 18400, competition: 44, status: 'poor' },
-  { key: 6, tag: 'dainty', score: 32, volume: 62000, competition: 95, status: 'poor' },
-  { key: 7, tag: 'minimalist ring', score: 71, volume: 28900, competition: 63, status: 'good' },
-];
 
 const statusConfig = {
   excellent: { color: colors.success, icon: <CheckCircleOutlined />, label: 'Excellent' },
@@ -57,10 +48,28 @@ const TagAnalyzerPage = () => {
     const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
     if (!tagList.length) { message.warning('Enter tags separated by commas'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setResults(MOCK_ANALYSIS.slice(0, Math.min(tagList.length, MOCK_ANALYSIS.length)));
-    setLoading(false);
-    refresh();
+    try {
+      const res = await etsyApi.analyzeTags({ tags: tagList });
+      const rows = (res.data?.tags || res.tags || []).map((t, i) => {
+        const score = t.score || t.qualityScore || 0;
+        return {
+          key: i,
+          tag: t.tag || t.name || tagList[i] || '',
+          score,
+          volume: t.volume || 0,
+          competition: t.competition || 0,
+          status: score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'fair' : 'poor',
+        };
+      });
+      setResults(rows);
+      if (!rows.length) message.info('No tag analysis data found');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Tag analysis failed');
+      setResults([]);
+    } finally {
+      setLoading(false);
+      refresh();
+    }
   };
 
   const avgScore = results.length ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length) : 0;

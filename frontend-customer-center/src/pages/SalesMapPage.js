@@ -1,34 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Typography, Row, Col, Statistic, Space,
-  theme, Select, Table,
+  theme, Select, Table, Empty, Spin,
 } from 'antd';
 import {
   EnvironmentOutlined, DollarOutlined, ShoppingOutlined,
   GlobalOutlined, TrophyOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
+import FeatureGate from '../components/common/FeatureGate';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 const BRAND = '#6C63FF';
-
-const MOCK_MAP_DATA = [
-  { key: 1, region: 'United States', flag: '🇺🇸', orders: 142, revenue: 5680, pct: 45, topCity: 'New York' },
-  { key: 2, region: 'United Kingdom', flag: '🇬🇧', orders: 38, revenue: 1520, pct: 12, topCity: 'London' },
-  { key: 3, region: 'Canada', flag: '🇨🇦', orders: 34, revenue: 1360, pct: 11, topCity: 'Toronto' },
-  { key: 4, region: 'Australia', flag: '🇦🇺', orders: 28, revenue: 1120, pct: 9, topCity: 'Sydney' },
-  { key: 5, region: 'Germany', flag: '🇩🇪', orders: 22, revenue: 880, pct: 7, topCity: 'Berlin' },
-  { key: 6, region: 'France', flag: '🇫🇷', orders: 18, revenue: 720, pct: 6, topCity: 'Paris' },
-  { key: 7, region: 'Japan', flag: '🇯🇵', orders: 12, revenue: 480, pct: 4, topCity: 'Tokyo' },
-  { key: 8, region: 'Other', flag: '🌍', orders: 22, revenue: 880, pct: 6, topCity: '—' },
-];
 
 const SalesMapPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const [period, setPeriod] = useState('30d');
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const card = {
     borderRadius: radii.lg,
@@ -36,10 +29,34 @@ const SalesMapPage = () => {
     background: tok.colorBgContainer,
   };
 
-  const totalOrders = MOCK_MAP_DATA.reduce((s, d) => s + d.orders, 0);
-  const totalRevenue = MOCK_MAP_DATA.reduce((s, d) => s + d.revenue, 0);
-  const topRegion = MOCK_MAP_DATA[0];
-  const countries = MOCK_MAP_DATA.filter(d => d.region !== 'Other').length;
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await etsyApi.getSalesMap({ period });
+      const regions = (res.data?.regions || res.regions || []).map((r, i) => ({
+        key: i,
+        region: r.region || r.country || 'Unknown',
+        flag: r.flag || '🌍',
+        orders: r.orders || r.count || 0,
+        revenue: r.revenue || 0,
+        pct: r.pct || r.percentage || 0,
+        topCity: r.topCity || '—',
+      }));
+      setData(regions);
+    } catch (err) {
+      if (err?.response?.status !== 401) console.warn('Failed to load sales map');
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [period]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const totalOrders = data.reduce((s, d) => s + d.orders, 0);
+  const totalRevenue = data.reduce((s, d) => s + d.revenue, 0);
+  const topRegion = data[0] || { region: '—' };
+  const countries = data.filter(d => d.region !== 'Other').length;
 
   const columns = [
     {
@@ -113,87 +130,73 @@ const SalesMapPage = () => {
         />
       </div>
 
-      {/* Stats */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Total Orders"
-              value={totalOrders}
-              prefix={<ShoppingOutlined style={{ color: BRAND }} />}
-              valueStyle={{ fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Total Revenue"
-              value={totalRevenue}
-              prefix={<DollarOutlined style={{ color: colors.success }} />}
-              valueStyle={{ color: colors.success, fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Countries"
-              value={countries}
-              prefix={<GlobalOutlined style={{ color: colors.info }} />}
-              valueStyle={{ fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Top Region"
-              value={topRegion.region}
-              prefix={<TrophyOutlined style={{ color: colors.warning }} />}
-              valueStyle={{ fontSize: 16, fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <FeatureGate featureKey="sales_map">
+        {/* Stats */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Total Orders" value={totalOrders} prefix={<ShoppingOutlined style={{ color: BRAND }} />} valueStyle={{ fontWeight: 700 }} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Total Revenue" value={totalRevenue} prefix={<DollarOutlined style={{ color: colors.success }} />} valueStyle={{ color: colors.success, fontWeight: 700 }} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Countries" value={countries} prefix={<GlobalOutlined style={{ color: colors.info }} />} valueStyle={{ fontWeight: 700 }} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Top Region" value={topRegion.region} prefix={<TrophyOutlined style={{ color: colors.warning }} />} valueStyle={{ fontSize: 16, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        </Row>
 
-      {/* Visual region breakdown */}
-      <Card style={{ ...card, marginBottom: 24 }}>
-        <Title level={5} style={{ marginBottom: 16 }}>Sales by Region</Title>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {MOCK_MAP_DATA.map((d) => (
-            <div
-              key={d.key}
-              style={{
-                flex: `${d.pct} 0 0`,
-                minWidth: 60,
-                background: `linear-gradient(135deg, ${BRAND}${Math.min(20 + d.pct, 99).toString(16)}, ${colors.brandLight}${Math.min(20 + d.pct, 99).toString(16)})`,
-                borderRadius: radii.sm,
-                padding: '12px 10px',
-                textAlign: 'center',
-                transition: 'transform 0.2s',
-                cursor: 'default',
-              }}
-            >
-              <div style={{ fontSize: 20 }}>{d.flag}</div>
-              <Text style={{ fontSize: 11, fontWeight: 600, display: 'block', color: isDark ? '#e8e8f0' : '#333' }}>
-                {d.pct}%
-              </Text>
-            </div>
-          ))}
-        </div>
-      </Card>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
+        ) : data.length > 0 ? (
+          <>
+            {/* Visual region breakdown */}
+            <Card style={{ ...card, marginBottom: 24 }}>
+              <Title level={5} style={{ marginBottom: 16 }}>Sales by Region</Title>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {data.map((d) => (
+                  <div
+                    key={d.key}
+                    style={{
+                      flex: `${Math.max(d.pct, 4)} 0 0`,
+                      minWidth: 60,
+                      background: `linear-gradient(135deg, ${BRAND}${Math.min(20 + d.pct, 99).toString(16)}, ${colors.brandLight}${Math.min(20 + d.pct, 99).toString(16)})`,
+                      borderRadius: radii.sm,
+                      padding: '12px 10px',
+                      textAlign: 'center',
+                      cursor: 'default',
+                    }}
+                  >
+                    <div style={{ fontSize: 20 }}>{d.flag}</div>
+                    <Text style={{ fontSize: 11, fontWeight: 600, display: 'block', color: isDark ? '#e8e8f0' : '#333' }}>
+                      {d.pct}%
+                    </Text>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-      {/* Table */}
-      <Card style={card}>
-        <Title level={5} style={{ marginBottom: 16 }}>Region Details</Title>
-        <Table
-          columns={columns}
-          dataSource={MOCK_MAP_DATA}
-          pagination={false}
-          size="middle"
-        />
-      </Card>
+            {/* Table */}
+            <Card style={card}>
+              <Title level={5} style={{ marginBottom: 16 }}>Region Details</Title>
+              <Table columns={columns} dataSource={data} pagination={false} size="middle" />
+            </Card>
+          </>
+        ) : (
+          <Card style={card}>
+            <Empty description="No sales data available. Sales geography will appear once you have orders." />
+          </Card>
+        )}
+      </FeatureGate>
     </AppLayout>
   );
 };

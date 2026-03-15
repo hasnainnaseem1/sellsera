@@ -8,6 +8,9 @@ const cron = require('node-cron');
 const trialExpiry = require('./trialExpiry');
 const trialWarning = require('./trialWarning');
 const usageReset = require('./usageReset');
+const shopSync = require('./shopSync');
+const competitorSync = require('./competitorSync');
+const apiKeyReset = require('./apiKeyReset');
 
 /* ─── Built-in system jobs ─── */
 const systemJobs = {
@@ -50,12 +53,54 @@ const systemJobs = {
     runCount: 0,
     task: null,
   },
+  shopSync: {
+    name: 'Daily Etsy Shop Sync',
+    description: 'Syncs listings and receipts for all active Etsy shops',
+    schedule: '0 3 * * *',
+    scheduleLabel: 'Daily at 3:00 AM',
+    system: true,
+    enabled: true,
+    lastRun: null,
+    lastStatus: null,
+    lastError: null,
+    runCount: 0,
+    task: null,
+  },
+  competitorSync: {
+    name: 'Daily Competitor Sync',
+    description: 'Captures new snapshots for all active competitor watches',
+    schedule: '0 4 * * *',
+    scheduleLabel: 'Daily at 4:00 AM',
+    system: true,
+    enabled: true,
+    lastRun: null,
+    lastStatus: null,
+    lastError: null,
+    runCount: 0,
+    task: null,
+  },
+  apiKeyReset: {
+    name: 'Daily API Key Counter Reset',
+    description: 'Resets daily usage counters for Etsy API keys',
+    schedule: '0 0 * * *',
+    scheduleLabel: 'Daily at midnight',
+    system: true,
+    enabled: true,
+    lastRun: null,
+    lastStatus: null,
+    lastError: null,
+    runCount: 0,
+    task: null,
+  },
 };
 
 const systemRunners = {
   trialExpiry: trialExpiry.run,
   trialWarning: trialWarning.run,
   usageReset: usageReset.run,
+  shopSync: shopSync.run,
+  competitorSync: competitorSync.run,
+  apiKeyReset: apiKeyReset.run,
 };
 
 /* ─── Custom jobs (loaded from DB at init, keyed by DB _id) ─── */
@@ -286,6 +331,9 @@ const initializeJobs = async () => {
   console.log('   • Trial expiry check — every hour');
   console.log('   • Trial warning emails — daily at 9 AM');
   console.log('   • Usage reset — every hour');
+  console.log('   • Etsy shop sync — daily at 3 AM');
+  console.log('   • Competitor sync — daily at 4 AM');
+  console.log('   • API key counter reset — daily at midnight');
 };
 
 /* ─── API methods ─── */

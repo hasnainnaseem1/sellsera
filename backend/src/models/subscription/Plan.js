@@ -25,6 +25,12 @@ const planFeatureSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  // Period type for usage counting (monthly = standard, lifetime = all-time cap)
+  periodType: {
+    type: String,
+    enum: ['monthly', 'lifetime'],
+    default: 'monthly'
+  },
   // Flexible value (e.g. text-based config)
   value: {
     type: mongoose.Schema.Types.Mixed,

@@ -17,6 +17,7 @@ const blogRoutes = require('./blog.routes');
 const seoRoutes = require('./seo.routes');
 const uploadRoutes = require('./upload.routes');
 const cronRoutes = require('./cron.routes');
+const etsyKeysRoutes = require('./etsy-keys.routes');
 
 // All admin routes require admin authentication
 const { adminAuth } = require('../../../middleware/auth');
@@ -39,5 +40,6 @@ router.use('/blog', adminAuth, blogRoutes);
 router.use('/seo', adminAuth, seoRoutes);
 router.use('/upload', adminAuth, uploadRoutes);
 router.use('/cron', adminAuth, cronRoutes);
+router.use('/etsy-keys', adminAuth, etsyKeysRoutes);
 
 module.exports = router;

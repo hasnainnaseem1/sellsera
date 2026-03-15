@@ -522,6 +522,32 @@ const adminSettingsSchema = new mongoose.Schema({
   },
 
   // ==========================================
+  // ETSY INTEGRATION SETTINGS
+  // ==========================================
+  etsySettings: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    clientId: {
+      type: String,
+      default: ''
+    },
+    clientSecret: {
+      type: String,
+      default: ''
+    },
+    redirectUri: {
+      type: String,
+      default: ''
+    },
+    encryptionKey: {
+      type: String,
+      default: ''
+    }
+  },
+
+  // ==========================================
   // GOOGLE SSO SETTINGS
   // ==========================================
   googleSSOSettings: {

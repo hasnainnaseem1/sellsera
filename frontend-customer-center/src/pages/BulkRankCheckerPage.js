@@ -14,19 +14,11 @@ import UsageBadge from '../components/common/UsageBadge';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 const BRAND = '#6C63FF';
-
-const MOCK_RESULTS = [
-  { key: 1, keyword: 'handmade earrings', rank: 3, page: 1, volume: 42000, change: 2, trend: 'up' },
-  { key: 2, keyword: 'boho necklace', rank: 12, page: 1, volume: 28000, change: -1, trend: 'down' },
-  { key: 3, keyword: 'personalized bracelet', rank: 8, page: 1, volume: 35000, change: 5, trend: 'up' },
-  { key: 4, keyword: 'vintage ring', rank: 24, page: 2, volume: 18500, change: 0, trend: 'stable' },
-  { key: 5, keyword: 'custom pendant', rank: 6, page: 1, volume: 22000, change: 3, trend: 'up' },
-  { key: 6, keyword: 'crystal jewelry', rank: 45, page: 3, volume: 31000, change: -8, trend: 'down' },
-];
 
 const BulkRankCheckerPage = () => {
   const { isDark } = useTheme();
@@ -48,10 +40,26 @@ const BulkRankCheckerPage = () => {
     const kws = keywords.split('\n').map(k => k.trim()).filter(Boolean);
     if (!kws.length) { message.warning('Enter at least one keyword'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setResults(MOCK_RESULTS.slice(0, Math.min(kws.length, MOCK_RESULTS.length)));
-    setLoading(false);
-    refresh();
+    try {
+      const res = await etsyApi.checkRankings({ keywords: kws });
+      const rows = (res.data?.results || res.results || []).map((r, i) => ({
+        key: i,
+        keyword: r.keyword || kws[i] || '',
+        rank: r.rank || r.position || 0,
+        page: r.page || Math.ceil((r.rank || 1) / 48),
+        volume: r.volume || 0,
+        change: r.change || 0,
+        trend: r.trend || 'stable',
+      }));
+      setResults(rows);
+      if (!rows.length) message.info('No ranking data found');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Rank check failed');
+      setResults([]);
+    } finally {
+      setLoading(false);
+      refresh();
+    }
   };
 
   const avgRank = results.length ? Math.round(results.reduce((s, r) => s + r.rank, 0) / results.length) : 0;

@@ -26,6 +26,17 @@ const getSettings = async (req, res) => {
       if (sanitizedSettings.googleSSOSettings) {
         delete sanitizedSettings.googleSSOSettings.clientSecret;
       }
+      // Hide Etsy secrets from non-super-admins
+      if (sanitizedSettings.etsySettings) {
+        delete sanitizedSettings.etsySettings.clientSecret;
+        delete sanitizedSettings.etsySettings.encryptionKey;
+      }
+    }
+
+    // For Etsy, always add computed flags so UI knows if secrets are set
+    if (sanitizedSettings.etsySettings) {
+      sanitizedSettings.etsySettings.hasClientSecret = !!settings.etsySettings?.clientSecret;
+      sanitizedSettings.etsySettings.hasEncryptionKey = !!settings.etsySettings?.encryptionKey;
     }
 
     res.json(resolveFromReq({
@@ -878,6 +889,68 @@ const updateGoogleSSO = async (req, res) => {
   }
 };
 
+// PUT /api/v1/admin/settings/etsy
+const updateEtsySettings = async (req, res) => {
+  try {
+    const { enabled, clientId, clientSecret, redirectUri, encryptionKey } = req.body;
+    const clientIP = getClientIP(req);
+
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Only super admins can update Etsy settings' });
+    }
+
+    const settings = await AdminSettings.getSettings();
+
+    if (!settings.etsySettings) settings.etsySettings = {};
+
+    if (typeof enabled === 'boolean') settings.etsySettings.enabled = enabled;
+    if (clientId !== undefined) settings.etsySettings.clientId = clientId.trim();
+    if (redirectUri !== undefined) settings.etsySettings.redirectUri = redirectUri.trim();
+    // Only update secrets if non-empty (skip blank = keep existing)
+    if (clientSecret && clientSecret.trim()) {
+      settings.etsySettings.clientSecret = clientSecret.trim();
+    }
+    if (encryptionKey && encryptionKey.trim()) {
+      settings.etsySettings.encryptionKey = encryptionKey.trim();
+    }
+
+    settings.markModified('etsySettings');
+    settings.lastUpdatedBy = req.userId;
+    await safeSave(settings);
+
+    await safeActivityLog(ActivityLog, {
+      userId: req.userId,
+      userName: req.user.name,
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      action: 'settings_updated',
+      actionType: 'update',
+      targetModel: 'Settings',
+      description: 'Etsy integration settings updated',
+      metadata: { clientId: clientId ? '***set***' : '(unchanged)', enabled },
+      ipAddress: clientIP,
+      userAgent: req.get('user-agent'),
+      status: 'success'
+    });
+
+    res.json({
+      success: true,
+      message: 'Etsy settings saved successfully',
+      etsySettings: {
+        enabled: settings.etsySettings.enabled,
+        clientId: settings.etsySettings.clientId,
+        redirectUri: settings.etsySettings.redirectUri,
+        hasClientSecret: !!settings.etsySettings.clientSecret,
+        hasEncryptionKey: !!settings.etsySettings.encryptionKey,
+      }
+    });
+
+  } catch (error) {
+    console.error('Update Etsy settings error:', error);
+    res.status(500).json({ success: false, message: 'Error updating Etsy settings' });
+  }
+};
+
 // PUT /api/v1/admin/settings/stripe
 const updateStripeSettings = async (req, res) => {
   try {
@@ -1072,6 +1145,7 @@ module.exports = {
   addBlockedDomain,
   removeBlockedDomain,
   updateGoogleSSO,
+  updateEtsySettings,
   updateStripeSettings,
   getEmailTemplates,
   updateEmailTemplate,

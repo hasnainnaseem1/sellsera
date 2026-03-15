@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Typography, Row, Col, Statistic, Table, Space,
   Input, Button, Empty, message, theme, Tooltip,
@@ -15,28 +15,10 @@ import UsageBadge from '../components/common/UsageBadge';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 const BRAND = '#6C63FF';
-
-const MOCK_DATA = [
-  {
-    key: 1, name: 'CraftedByEmma', dailySales: 42, revenue: 1680, topListing: 'Gold Chain Necklace',
-    topListingSales: 128, avgPrice: 40, trend: 'up', trendPct: 14, listings: 142,
-  },
-  {
-    key: 2, name: 'VintageFindsShop', dailySales: 18, revenue: 720, topListing: 'Vintage Clock',
-    topListingSales: 67, avgPrice: 40, trend: 'down', trendPct: -5, listings: 89,
-  },
-  {
-    key: 3, name: 'ArtisanWoods', dailySales: 31, revenue: 1240, topListing: 'Wooden Serving Board',
-    topListingSales: 94, avgPrice: 40, trend: 'up', trendPct: 22, listings: 67,
-  },
-  {
-    key: 4, name: 'ModernMacrame', dailySales: 24, revenue: 960, topListing: 'Large Wall Hanging',
-    topListingSales: 53, avgPrice: 40, trend: 'stable', trendPct: 1, listings: 48,
-  },
-];
 
 const CompetitorSalesPage = () => {
   const { isDark } = useTheme();
@@ -44,7 +26,7 @@ const CompetitorSalesPage = () => {
   const { getFeatureAccess, refresh } = usePermissions();
   getFeatureAccess('competitor_sales');
 
-  const [data, setData] = useState(MOCK_DATA);
+  const [data, setData] = useState([]);
   const [shopUrl, setShopUrl] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -54,26 +36,54 @@ const CompetitorSalesPage = () => {
     background: tok.colorBgContainer,
   };
 
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await etsyApi.getWatchList();
+      const watches = res.data?.watches || res.watches || [];
+      // For each watched shop, build a sales row
+      const rows = await Promise.all(watches.map(async (w) => {
+        let salesInfo = {};
+        try {
+          const sRes = await etsyApi.getCompetitorSales(w._id || w.id);
+          salesInfo = sRes.data || sRes || {};
+        } catch { /* no sales data yet */ }
+        return {
+          key: w._id || w.id,
+          _id: w._id || w.id,
+          name: w.shopName || w.name,
+          dailySales: salesInfo.dailySales || 0,
+          revenue: salesInfo.revenue || 0,
+          topListing: salesInfo.topListing?.title || '—',
+          topListingSales: salesInfo.topListing?.sales || 0,
+          avgPrice: salesInfo.avgPrice || 0,
+          trend: salesInfo.trend || 'stable',
+          trendPct: salesInfo.trendPct || 0,
+          listings: w.latestSnapshot?.listingCount || 0,
+        };
+      }));
+      setData(rows);
+    } catch (err) {
+      if (err?.response?.status !== 401) console.warn('Failed to load competitor sales');
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   const handleAdd = async () => {
     if (!shopUrl.trim()) { message.warning('Enter an Etsy shop URL or name'); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setData(prev => [...prev, {
-      key: Date.now(),
-      name: shopUrl.replace('https://www.etsy.com/shop/', '').replace(/\//g, ''),
-      dailySales: Math.floor(Math.random() * 50) + 5,
-      revenue: Math.floor(Math.random() * 2000) + 200,
-      topListing: 'Sample Listing',
-      topListingSales: Math.floor(Math.random() * 100) + 10,
-      avgPrice: Math.floor(Math.random() * 50) + 15,
-      trend: 'up',
-      trendPct: Math.floor(Math.random() * 25),
-      listings: Math.floor(Math.random() * 200) + 20,
-    }]);
-    setShopUrl('');
-    setLoading(false);
-    refresh();
-    message.success('Shop added to sales tracking');
+    try {
+      const shopName = shopUrl.trim().replace('https://www.etsy.com/shop/', '').replace(/\//g, '');
+      await etsyApi.addCompetitor({ shopName });
+      setShopUrl('');
+      message.success('Shop added to sales tracking');
+      fetchData();
+      refresh();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to add shop');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const totalDailySales = data.reduce((s, d) => s + d.dailySales, 0);
@@ -132,9 +142,14 @@ const CompetitorSalesPage = () => {
         <Button
           type="text" danger size="small"
           icon={<DeleteOutlined />}
-          onClick={() => {
-            setData(prev => prev.filter(d => d.key !== row.key));
-            message.success('Shop removed');
+          onClick={async () => {
+            try {
+              await etsyApi.removeCompetitor(row._id);
+              setData(prev => prev.filter(d => d.key !== row.key));
+              message.success('Shop removed');
+            } catch (err) {
+              message.error('Failed to remove shop');
+            }
           }}
         />
       ),

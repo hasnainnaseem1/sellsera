@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Typography, Row, Col, Statistic, Table, Tag, Space,
-  Input, theme, Progress,
+  Input, theme, Progress, Empty, Spin,
 } from 'antd';
 import {
   TruckOutlined, CheckCircleOutlined,
@@ -9,34 +9,28 @@ import {
   EnvironmentOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
+import FeatureGate from '../components/common/FeatureGate';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 const BRAND = '#6C63FF';
 
-const MOCK_ORDERS = [
-  { key: 1, orderId: '#8421', buyer: 'Sarah M.', item: 'Handmade Ceramic Mug', status: 'delivered', carrier: 'USPS', tracking: '9400111899223...', shipped: 'Mar 8', eta: 'Mar 11', destination: 'New York, NY' },
-  { key: 2, orderId: '#8420', buyer: 'James L.', item: 'Gold Chain Necklace', status: 'in_transit', carrier: 'UPS', tracking: '1Z999AA10123...', shipped: 'Mar 10', eta: 'Mar 14', destination: 'Los Angeles, CA' },
-  { key: 3, orderId: '#8419', buyer: 'Emily R.', item: 'Custom Pet Portrait', status: 'in_transit', carrier: 'USPS', tracking: '9400111899224...', shipped: 'Mar 9', eta: 'Mar 13', destination: 'Chicago, IL' },
-  { key: 4, orderId: '#8418', buyer: 'Mike T.', item: 'Vintage Leather Journal', status: 'shipped', carrier: 'FedEx', tracking: '7489234091...', shipped: 'Mar 12', eta: 'Mar 16', destination: 'Houston, TX' },
-  { key: 5, orderId: '#8417', buyer: 'Lisa K.', item: 'Boho Macrame Hanging', status: 'processing', carrier: '—', tracking: '—', shipped: '—', eta: 'Mar 18', destination: 'Phoenix, AZ' },
-  { key: 6, orderId: '#8416', buyer: 'David W.', item: 'Silver Ring Set', status: 'delivered', carrier: 'USPS', tracking: '9400111899225...', shipped: 'Mar 5', eta: 'Mar 8', destination: 'Seattle, WA' },
-  { key: 7, orderId: '#8415', buyer: 'Anna P.', item: 'Crystal Earrings', status: 'delayed', carrier: 'USPS', tracking: '9400111899226...', shipped: 'Mar 3', eta: 'Mar 7', destination: 'Denver, CO' },
-];
-
 const statusConfig = {
-  processing:  { color: colors.muted, icon: <InboxOutlined />, label: 'Processing', step: 0 },
-  shipped:     { color: colors.info, icon: <SendOutlined />, label: 'Shipped', step: 1 },
-  in_transit:  { color: BRAND, icon: <TruckOutlined />, label: 'In Transit', step: 2 },
-  delivered:   { color: colors.success, icon: <CheckCircleOutlined />, label: 'Delivered', step: 3 },
-  delayed:     { color: colors.danger, icon: <ExclamationCircleOutlined />, label: 'Delayed', step: 2 },
+  processing:  { color: colors.muted, icon: <InboxOutlined />, label: 'Processing' },
+  shipped:     { color: colors.info, icon: <SendOutlined />, label: 'Shipped' },
+  in_transit:  { color: BRAND, icon: <TruckOutlined />, label: 'In Transit' },
+  delivered:   { color: colors.success, icon: <CheckCircleOutlined />, label: 'Delivered' },
+  delayed:     { color: colors.danger, icon: <ExclamationCircleOutlined />, label: 'Delayed' },
 };
 
 const DeliveryStatusPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const [search, setSearch] = useState('');
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const card = {
     borderRadius: radii.lg,
@@ -44,18 +38,44 @@ const DeliveryStatusPage = () => {
     background: tok.colorBgContainer,
   };
 
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await etsyApi.getDeliveryStatus({ search: search || undefined });
+      const rows = (res.data?.orders || res.orders || []).map((o, i) => ({
+        key: o.receiptId || o._id || i,
+        orderId: o.receiptId ? `#${o.receiptId}` : `#${i}`,
+        buyer: o.buyerName || o.buyer || '—',
+        item: o.items?.[0]?.title || o.item || '—',
+        status: o.shipmentStatus || o.status || 'processing',
+        carrier: o.carrier || '—',
+        tracking: o.trackingNumber || '—',
+        eta: o.estimatedDelivery ? new Date(o.estimatedDelivery).toLocaleDateString() : '—',
+        destination: o.destination || o.shipTo || '—',
+      }));
+      setOrders(rows);
+    } catch (err) {
+      if (err?.response?.status !== 401) console.warn('Failed to load delivery status');
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
   const filtered = search
-    ? MOCK_ORDERS.filter(o =>
+    ? orders.filter(o =>
         o.orderId.toLowerCase().includes(search.toLowerCase()) ||
         o.buyer.toLowerCase().includes(search.toLowerCase()) ||
         o.item.toLowerCase().includes(search.toLowerCase())
       )
-    : MOCK_ORDERS;
+    : orders;
 
-  const delivered = MOCK_ORDERS.filter(o => o.status === 'delivered').length;
-  const inTransit = MOCK_ORDERS.filter(o => o.status === 'in_transit' || o.status === 'shipped').length;
-  const delayed = MOCK_ORDERS.filter(o => o.status === 'delayed').length;
-  const processing = MOCK_ORDERS.filter(o => o.status === 'processing').length;
+  const delivered = orders.filter(o => o.status === 'delivered').length;
+  const inTransit = orders.filter(o => o.status === 'in_transit' || o.status === 'shipped').length;
+  const delayed = orders.filter(o => o.status === 'delayed').length;
+  const processing = orders.filter(o => o.status === 'processing').length;
 
   const columns = [
     {
@@ -118,79 +138,64 @@ const DeliveryStatusPage = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Processing"
-              value={processing}
-              prefix={<InboxOutlined style={{ color: colors.muted }} />}
-              valueStyle={{ fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="In Transit"
-              value={inTransit}
-              prefix={<TruckOutlined style={{ color: BRAND }} />}
-              valueStyle={{ color: BRAND, fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Delivered"
-              value={delivered}
-              prefix={<CheckCircleOutlined style={{ color: colors.success }} />}
-              valueStyle={{ color: colors.success, fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card style={card}>
-            <Statistic
-              title="Delayed"
-              value={delayed}
-              prefix={<ExclamationCircleOutlined style={{ color: colors.danger }} />}
-              valueStyle={{ color: delayed > 0 ? colors.danger : colors.success, fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <FeatureGate featureKey="delivery_tracking">
+        {/* Stats */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Processing" value={processing} prefix={<InboxOutlined style={{ color: colors.muted }} />} valueStyle={{ fontWeight: 700 }} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="In Transit" value={inTransit} prefix={<TruckOutlined style={{ color: BRAND }} />} valueStyle={{ color: BRAND, fontWeight: 700 }} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Delivered" value={delivered} prefix={<CheckCircleOutlined style={{ color: colors.success }} />} valueStyle={{ color: colors.success, fontWeight: 700 }} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card style={card}>
+              <Statistic title="Delayed" value={delayed} prefix={<ExclamationCircleOutlined style={{ color: colors.danger }} />} valueStyle={{ color: delayed > 0 ? colors.danger : colors.success, fontWeight: 700 }} />
+            </Card>
+          </Col>
+        </Row>
 
-      {/* Fulfillment progress */}
-      <Card style={{ ...card, marginBottom: 24 }}>
-        <Title level={5} style={{ marginBottom: 12 }}>Fulfillment Rate</Title>
-        <Progress
-          percent={Math.round((delivered / MOCK_ORDERS.length) * 100)}
-          strokeColor={{ from: BRAND, to: colors.brandLight }}
-          format={(pct) => `${pct}% delivered`}
-        />
-      </Card>
+        {/* Fulfillment progress */}
+        {orders.length > 0 && (
+          <Card style={{ ...card, marginBottom: 24 }}>
+            <Title level={5} style={{ marginBottom: 12 }}>Fulfillment Rate</Title>
+            <Progress
+              percent={Math.round((delivered / orders.length) * 100)}
+              strokeColor={{ from: BRAND, to: colors.brandLight }}
+              format={(pct) => `${pct}% delivered`}
+            />
+          </Card>
+        )}
 
-      {/* Table */}
-      <Card style={card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <Title level={5} style={{ margin: 0 }}>All Shipments</Title>
-          <Input
-            prefix={<SearchOutlined style={{ color: colors.muted }} />}
-            placeholder="Search orders..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ width: 240, borderRadius: radii.sm }}
-          />
-        </div>
-        <Table
-          columns={columns}
-          dataSource={filtered}
-          pagination={{ pageSize: 10 }}
-          size="middle"
-        />
-      </Card>
+        {/* Table */}
+        <Card style={card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Title level={5} style={{ margin: 0 }}>All Shipments</Title>
+            <Input
+              prefix={<SearchOutlined style={{ color: colors.muted }} />}
+              placeholder="Search orders..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: 240, borderRadius: radii.sm }}
+            />
+          </div>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
+          ) : filtered.length > 0 ? (
+            <Table columns={columns} dataSource={filtered} pagination={{ pageSize: 10 }} size="middle" />
+          ) : (
+            <Empty description="No shipments found. Orders will appear here once your Etsy shop has receipts." />
+          )}
+        </Card>
+      </FeatureGate>
     </AppLayout>
   );
 };

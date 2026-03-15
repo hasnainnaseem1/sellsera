@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Row, Col, Card, Statistic, Button, Typography,
-  Tag, Progress, theme, Alert, Space, List, Empty
+  Tag, Progress, theme, Alert, Space, List, Empty, message
 } from "antd";
 import {
   ThunderboltOutlined, RocketOutlined,
@@ -9,7 +9,7 @@ import {
   ArrowRightOutlined, SyncOutlined, SearchOutlined, KeyOutlined,
   TeamOutlined, HistoryOutlined, EyeOutlined, LockOutlined,
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../components/AppLayout";
 import SuccessTracker from "../components/dashboard/SuccessTracker";
 import ConnectShopPrompt from "../components/ConnectShopPrompt";
@@ -20,22 +20,46 @@ import { useSite } from "../context/SiteContext";
 import { usePermissions } from "../context/PermissionsContext";
 import { colors, radii } from "../theme/tokens";
 import analysisApi from "../api/analysisApi";
+import etsyApi from "../api/etsyApi";
 
 const { Title, Text } = Typography;
 const BRAND = "#6C63FF";
 
 const DashboardPage = () => {
-  const { user } = useAuth();
+  const { user, fetchMe, token } = useAuth();
   const { isDark } = useTheme();
   const { siteConfig } = useSite();
   const { getFeatureAccess } = usePermissions();
   const { token: tok } = theme.useToken();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const analysisEnabled = siteConfig?.enableAnalysis !== false;
   const subscriptionsEnabled = siteConfig?.enableSubscriptions !== false;
 
   const [recentAnalyses, setRecentAnalyses] = useState([]);
   const [shopSyncing, setShopSyncing] = useState(false);
+
+  // Detect OAuth callback redirect — ?etsy_connected=true&shop=ShopName
+  useEffect(() => {
+    const connected = searchParams.get('etsy_connected');
+    const etsyError = searchParams.get('etsy_error');
+    if (connected === 'true') {
+      const shopName = searchParams.get('shop');
+      message.success(`Etsy shop${shopName ? ` "${shopName}"` : ''} connected! Syncing your data...`);
+      setShopSyncing(true);
+      // Refresh user state so etsyConnected flag is updated
+      fetchMe(token);
+      // Clean URL params
+      setSearchParams({}, { replace: true });
+    } else if (etsyError) {
+      const errorMessages = {
+        access_denied: 'You declined the Etsy authorization request.',
+        connection_failed: 'Failed to connect your Etsy shop. Please try again.',
+      };
+      message.error(errorMessages[etsyError] || 'Something went wrong connecting your Etsy shop.');
+      setSearchParams({}, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Determine if user has connected their shop
   const hasShop = !!user?.etsyConnected;
@@ -100,10 +124,15 @@ const DashboardPage = () => {
     return (
       <AppLayout>
         <ConnectShopPrompt
-          onConnect={() => {
-            // In production, this would redirect to backend OAuth URL:
-            // window.location.href = `${config.apiUrl}/api/v1/etsy/auth`;
-            setShopSyncing(true);
+          onConnect={async () => {
+            try {
+              const res = await etsyApi.getAuthUrl();
+              if (res.success && res.data?.authUrl) {
+                window.location.href = res.data.authUrl;
+              }
+            } catch {
+              setShopSyncing(true);
+            }
           }}
         />
       </AppLayout>

@@ -97,6 +97,13 @@ const settingsApi = {
     axiosInstance.delete(`/api/v1/admin/settings/email-blocking/domains/${domain}`).then((r) => r.data),
 
   /**
+   * PUT /api/v1/admin/settings/etsy
+   * Update Etsy OAuth integration settings (super_admin only)
+   */
+  updateEtsy: (data) =>
+    axiosInstance.put('/api/v1/admin/settings/etsy', data).then((r) => r.data),
+
+  /**
    * PUT /api/v1/admin/settings/google-sso
    * Update Google SSO configuration (super_admin only)
    */

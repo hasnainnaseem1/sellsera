@@ -12,8 +12,10 @@ import {
   SettingOutlined, PlusOutlined, EditOutlined, DeleteOutlined,
   EyeOutlined, UndoOutlined, FileTextOutlined, CopyOutlined,
   ShoppingCartOutlined, SwapOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
 import settingsApi from '../../api/settingsApi';
+import etsyKeysApi from '../../api/etsyKeysApi';
 
 const { Title, Text, Paragraph } = Typography;
 const BRAND = '#6C63FF';
@@ -1516,6 +1518,291 @@ const LemonSqueezyTab = () => {
   );
 };
 
+/* ═══════════════════════════ Etsy Integration Tab ═══════════════════════════ */
+const EtsyTab = () => {
+  // ── OAuth App Config Section ──
+  const [oauthForm] = Form.useForm();
+  const [oauthLoading, setOauthLoading] = useState(true);
+  const [oauthSaving, setOauthSaving] = useState(false);
+  const [currentEtsy, setCurrentEtsy] = useState(null);
+
+  const fetchEtsySettings = useCallback(async () => {
+    try {
+      setOauthLoading(true);
+      const data = await settingsApi.getSettings();
+      if (data.success) {
+        const etsy = data.settings?.etsySettings || {};
+        setCurrentEtsy(etsy);
+        oauthForm.setFieldsValue({
+          enabled: etsy.enabled || false,
+          clientId: etsy.clientId || '',
+          clientSecret: '',
+          redirectUri: etsy.redirectUri || '',
+          encryptionKey: '',
+        });
+      }
+    } catch {
+      message.error('Failed to load Etsy settings');
+    } finally {
+      setOauthLoading(false);
+    }
+  }, [oauthForm]);
+
+  useEffect(() => { fetchEtsySettings(); }, [fetchEtsySettings]);
+
+  const handleSaveOAuth = async (values) => {
+    setOauthSaving(true);
+    try {
+      const payload = {
+        enabled: values.enabled,
+        clientId: values.clientId,
+        redirectUri: values.redirectUri,
+      };
+      if (values.clientSecret?.trim()) payload.clientSecret = values.clientSecret;
+      if (values.encryptionKey?.trim()) payload.encryptionKey = values.encryptionKey;
+      const data = await settingsApi.updateEtsy(payload);
+      if (data.success) {
+        message.success('Etsy settings saved successfully');
+        oauthForm.setFieldsValue({ clientSecret: '', encryptionKey: '' });
+        fetchEtsySettings();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to save Etsy settings');
+    } finally {
+      setOauthSaving(false);
+    }
+  };
+
+  // ── API Key Pool Section ──
+  const [keys, setKeys] = useState([]);
+  const [keysLoading, setKeysLoading] = useState(true);
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [editingKey, setEditingKey] = useState(null);
+  const [keyForm] = Form.useForm();
+
+  const fetchKeys = useCallback(async () => {
+    try {
+      setKeysLoading(true);
+      const res = await etsyKeysApi.list();
+      if (res.success) setKeys(res.data || []);
+    } catch {
+      message.error('Failed to load Etsy API keys');
+    } finally {
+      setKeysLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchKeys(); }, [fetchKeys]);
+
+  const handleSaveKey = async () => {
+    try {
+      const values = await keyForm.validateFields();
+      if (editingKey) {
+        const payload = { label: values.label };
+        if (values.clientSecret) payload.clientSecret = values.clientSecret;
+        await etsyKeysApi.update(editingKey._id, payload);
+        message.success('API key updated');
+      } else {
+        await etsyKeysApi.add(values);
+        message.success('API key added');
+      }
+      setKeyModalOpen(false);
+      keyForm.resetFields();
+      setEditingKey(null);
+      fetchKeys();
+    } catch (err) {
+      if (err.response?.data?.message) message.error(err.response.data.message);
+    }
+  };
+
+  const handleToggle = async (id) => {
+    try {
+      await etsyKeysApi.toggle(id);
+      fetchKeys();
+    } catch {
+      message.error('Failed to toggle key');
+    }
+  };
+
+  const handleDeleteKey = async (id) => {
+    try {
+      await etsyKeysApi.remove(id);
+      message.success('API key removed');
+      fetchKeys();
+    } catch {
+      message.error('Failed to delete key');
+    }
+  };
+
+  const statusColor = { active: 'green', disabled: 'default', rate_limited: 'orange', error: 'red' };
+
+  const keyColumns = [
+    { title: 'Label', dataIndex: 'label', key: 'label' },
+    { title: 'API Key', dataIndex: 'apiKey', key: 'apiKey', render: (v) => <Text code>{v}</Text> },
+    {
+      title: 'Status', dataIndex: 'status', key: 'status',
+      render: (s) => <Tag color={statusColor[s] || 'default'}>{s?.toUpperCase()}</Tag>,
+    },
+    {
+      title: 'Requests / 24h', dataIndex: 'requestCount24h', key: 'requests',
+      render: (v) => v || 0,
+    },
+    { title: 'Errors', dataIndex: 'errorCount', key: 'errors', render: (v) => v || 0 },
+    {
+      title: 'Actions', key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title={record.status === 'active' ? 'Disable' : 'Enable'}>
+            <Button size="small" onClick={() => handleToggle(record._id)}>
+              {record.status === 'active' ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+            </Button>
+          </Tooltip>
+          <Tooltip title="Edit">
+            <Button size="small" icon={<EditOutlined />} onClick={() => {
+              setEditingKey(record);
+              keyForm.setFieldsValue({ label: record.label, clientId: '', clientSecret: '' });
+              setKeyModalOpen(true);
+            }} />
+          </Tooltip>
+          <Popconfirm title="Delete this API key?" onConfirm={() => handleDeleteKey(record._id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      {/* Section 1: Etsy OAuth App Configuration */}
+      <Alert
+        type="info"
+        showIcon
+        icon={<ShopOutlined />}
+        message="Etsy OAuth Integration"
+        description="Configure your Etsy API application credentials. These are used for the customer OAuth flow (Connect Shop). Get your credentials from the Etsy Developer Portal → Apps."
+        style={{ marginBottom: 24, borderRadius: 12 }}
+      />
+
+      <Form form={oauthForm} layout="vertical" onFinish={handleSaveOAuth} disabled={oauthLoading}>
+        <Form.Item name="enabled" label="Enable Etsy Integration" valuePropName="checked">
+          <Switch checkedChildren="On" unCheckedChildren="Off" />
+        </Form.Item>
+
+        <Form.Item name="clientId" label={<><KeyOutlined style={{ marginRight: 4 }} /> Client ID (API Key)</>}
+          rules={[{ required: true, message: 'Client ID is required' }]}
+          extra="Your Etsy App's API key (keystring). Found in Etsy Developer Portal."
+        >
+          <Input placeholder="e.g. abc123xyz456" />
+        </Form.Item>
+
+        <Form.Item name="clientSecret" label={<><SafetyOutlined style={{ marginRight: 4 }} /> Client Secret</>}
+          extra={currentEtsy?.hasClientSecret ? 'A secret is already saved. Leave blank to keep it.' : 'Your Etsy App shared secret.'}
+        >
+          <Input.Password placeholder="Leave blank to keep existing" />
+        </Form.Item>
+
+        <Form.Item name="redirectUri" label={<><LinkOutlined style={{ marginRight: 4 }} /> Redirect URI (Callback URL)</>}
+          rules={[{ required: true, message: 'Redirect URI is required' }]}
+          extra="Must match exactly what's configured in your Etsy App. Typically: http://localhost:3001/api/v1/customer/etsy/callback (dev) or https://yourdomain.com/api/v1/customer/etsy/callback (prod)"
+        >
+          <Input placeholder="http://localhost:3001/api/v1/customer/etsy/callback" />
+        </Form.Item>
+
+        <Form.Item name="encryptionKey" label={<><SafetyOutlined style={{ marginRight: 4 }} /> Encryption Key (AES-256-GCM)</>}
+          extra={currentEtsy?.hasEncryptionKey ? 'An encryption key is already saved. Leave blank to keep it.' : 'A 64-character hex string (32 bytes) used to encrypt OAuth tokens at rest.'}
+        >
+          <Input.Password placeholder="64 hex characters (leave blank to keep existing)" />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={oauthSaving}
+            style={{ background: BRAND, borderColor: BRAND }}>
+            Save Etsy Settings
+          </Button>
+        </Form.Item>
+      </Form>
+
+      {currentEtsy?.clientId && (
+        <Card size="small" style={{ marginBottom: 24, borderRadius: 12 }}>
+          <Descriptions column={1} size="small">
+            <Descriptions.Item label="Status">
+              <Badge status={currentEtsy.enabled ? 'success' : 'default'} text={currentEtsy.enabled ? 'Enabled' : 'Disabled'} />
+            </Descriptions.Item>
+            <Descriptions.Item label="Client ID">
+              <Text code>{currentEtsy.clientId}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="Client Secret">
+              <Tag color={currentEtsy.hasClientSecret ? 'green' : 'red'}>
+                {currentEtsy.hasClientSecret ? '✓ Configured' : '✗ Not Set'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Redirect URI">
+              {currentEtsy.redirectUri || <Text type="secondary">Not set</Text>}
+            </Descriptions.Item>
+            <Descriptions.Item label="Encryption Key">
+              <Tag color={currentEtsy.hasEncryptionKey ? 'green' : 'red'}>
+                {currentEtsy.hasEncryptionKey ? '✓ Configured' : '✗ Not Set'}
+              </Tag>
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+      )}
+
+      <Divider />
+
+      {/* Section 2: API Key Pool */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <Title level={5} style={{ margin: 0 }}>
+            <SwapOutlined style={{ marginRight: 6 }} />
+            API Key Rotation Pool
+          </Title>
+          <Text type="secondary">Extra Etsy API keys for rate-limit rotation (weighted round-robin). Not needed if you only have one Etsy App.</Text>
+        </div>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingKey(null); keyForm.resetFields(); setKeyModalOpen(true); }}>
+          Add Key
+        </Button>
+      </div>
+
+      <Table
+        dataSource={keys}
+        columns={keyColumns}
+        rowKey="_id"
+        loading={keysLoading}
+        pagination={false}
+        size="middle"
+      />
+
+      <Modal
+        title={editingKey ? 'Edit API Key' : 'Add API Key'}
+        open={keyModalOpen}
+        onCancel={() => { setKeyModalOpen(false); setEditingKey(null); keyForm.resetFields(); }}
+        onOk={handleSaveKey}
+        okText={editingKey ? 'Update' : 'Add'}
+      >
+        <Form form={keyForm} layout="vertical">
+          <Form.Item name="label" label="Label" rules={[{ required: true, message: 'Label is required' }]}>
+            <Input placeholder="e.g. Production Key 1" />
+          </Form.Item>
+          {!editingKey && (
+            <Form.Item name="clientId" label="Client ID" rules={[{ required: true, message: 'Client ID is required' }]}>
+              <Input placeholder="Etsy API Client ID" />
+            </Form.Item>
+          )}
+          <Form.Item
+            name="clientSecret"
+            label={editingKey ? 'New Client Secret (leave blank to keep current)' : 'Client Secret'}
+            rules={editingKey ? [] : [{ required: true, message: 'Client Secret is required' }]}
+          >
+            <Input.Password placeholder="Etsy API Client Secret" />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
 /* ═══════════════════════════ Main Page ═══════════════════════════ */
 const IntegrationsPage = () => {
   const items = [
@@ -1538,6 +1825,16 @@ const IntegrationsPage = () => {
         </span>
       ),
       children: <LemonSqueezyTab />,
+    },
+    {
+      key: 'etsy',
+      label: (
+        <span>
+          <ShopOutlined style={{ marginRight: 6 }} />
+          Etsy Integration
+        </span>
+      ),
+      children: <EtsyTab />,
     },
     {
       key: 'email',

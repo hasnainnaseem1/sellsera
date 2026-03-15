@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Input, Button, Table, Tag, Typography, Row, Col,
-  Space, Empty, Statistic, message, theme,
+  Space, Empty, Statistic, message, theme, Spin,
 } from 'antd';
 import {
   PlusOutlined, ShopOutlined, TrophyOutlined,
@@ -14,15 +14,9 @@ import UsageBadge from '../components/common/UsageBadge';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
-
-// Mock tracked shops for demonstration
-const MOCK_SHOPS = [
-  { key: 1, name: 'CraftedByEmma', listings: 142, sales: 4820, rating: 4.9, trend: '+12%', topCategory: 'Jewelry' },
-  { key: 2, name: 'VintageFindsShop', listings: 89, sales: 2340, rating: 4.7, trend: '+5%', topCategory: 'Home & Living' },
-  { key: 3, name: 'ArtisanWoods', listings: 67, sales: 1890, rating: 4.8, trend: '+18%', topCategory: 'Art & Collectibles' },
-];
 
 const CompetitorTrackerPage = () => {
   const { isDark } = useTheme();
@@ -31,8 +25,9 @@ const CompetitorTrackerPage = () => {
   const access = getFeatureAccess('competitor_tracking');
 
   const [shopUrl, setShopUrl] = useState('');
-  const [shops, setShops] = useState(MOCK_SHOPS);
+  const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
 
   const card = {
     borderRadius: radii.lg,
@@ -40,29 +35,55 @@ const CompetitorTrackerPage = () => {
     background: tok.colorBgContainer,
   };
 
+  const fetchWatchList = useCallback(async () => {
+    try {
+      const res = await etsyApi.getWatchList();
+      const list = (res.data?.watches || res.watches || []).map(w => ({
+        key: w._id || w.id,
+        _id: w._id || w.id,
+        name: w.shopName || w.name,
+        listings: w.latestSnapshot?.listingCount || w.listings || 0,
+        sales: w.latestSnapshot?.totalSales || w.sales || 0,
+        rating: w.latestSnapshot?.rating || w.rating || '—',
+        trend: w.latestSnapshot?.trend || '—',
+        topCategory: w.latestSnapshot?.topCategory || '—',
+      }));
+      setShops(list);
+    } catch (err) {
+      if (err?.response?.status !== 401) {
+        console.warn('Failed to load watch list');
+      }
+    } finally {
+      setFetchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchWatchList(); }, [fetchWatchList]);
+
   const handleAdd = async () => {
     if (!shopUrl.trim()) { message.warning('Enter an Etsy shop URL or name'); return; }
     setLoading(true);
-    // Simulate API delay — will be replaced with real endpoint
-    await new Promise(r => setTimeout(r, 1000));
-    const newShop = {
-      key: Date.now(),
-      name: shopUrl.replace('https://www.etsy.com/shop/', '').replace(/\//g, ''),
-      listings: Math.floor(Math.random() * 200) + 20,
-      sales: Math.floor(Math.random() * 5000) + 500,
-      rating: (4.5 + Math.random() * 0.5).toFixed(1),
-      trend: `+${Math.floor(Math.random() * 20)}%`,
-      topCategory: 'Jewelry',
-    };
-    setShops(prev => [...prev, newShop]);
-    setShopUrl('');
-    setLoading(false);
-    message.success(`Now tracking ${newShop.name}`);
+    try {
+      const shopName = shopUrl.trim().replace('https://www.etsy.com/shop/', '').replace(/\//g, '');
+      await etsyApi.addCompetitor({ shopName });
+      message.success(`Now tracking ${shopName}`);
+      setShopUrl('');
+      fetchWatchList();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to add competitor');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemove = (key) => {
-    setShops(prev => prev.filter(s => s.key !== key));
-    message.success('Shop removed');
+  const handleRemove = async (record) => {
+    try {
+      await etsyApi.removeCompetitor(record._id);
+      setShops(prev => prev.filter(s => s.key !== record.key));
+      message.success('Shop removed');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to remove competitor');
+    }
   };
 
   const columns = [
@@ -122,7 +143,7 @@ const CompetitorTrackerPage = () => {
       key: 'action',
       width: 50,
       render: (_, record) => (
-        <Button type="text" size="small" icon={<DeleteOutlined />} danger onClick={() => handleRemove(record.key)} />
+        <Button type="text" size="small" icon={<DeleteOutlined />} danger onClick={() => handleRemove(record)} />
       ),
     },
   ];

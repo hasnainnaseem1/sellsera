@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import {
-  Layout, Menu, Avatar, Dropdown, Button, Typography, Tooltip, Divider, Tag
+  Layout, Menu, Avatar, Dropdown, Button, Typography, Tooltip, Divider, Tag, Alert
 } from 'antd';
 import {
   DashboardOutlined,
@@ -14,7 +14,7 @@ import {
   ShopOutlined, LineChartOutlined, TruckOutlined,
   EnvironmentOutlined, BarChartOutlined,
   FileSearchOutlined, AuditOutlined,
-  ThunderboltOutlined,
+  ThunderboltOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -22,6 +22,7 @@ import { useSite } from '../context/SiteContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { colors } from '../theme/tokens';
 import CommandBar from './CommandBar';
+import etsyApi from '../api/etsyApi';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -38,6 +39,19 @@ const AppLayout = ({ children }) => {
   const { getFeatureAccess } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
   const [cmdBarOpen, setCmdBarOpen] = useState(false);
+  const [needsReauth, setNeedsReauth] = useState(false);
+
+  // Check if Etsy shop needs re-authorization
+  useEffect(() => {
+    if (!user?.etsyConnected) return;
+    etsyApi.getShopInfo()
+      .then(res => {
+        if (res.data?.status === 'token_revoked') setNeedsReauth(true);
+      })
+      .catch(err => {
+        if (err.response?.data?.code === 'SHOP_REQUIRES_REAUTH') setNeedsReauth(true);
+      });
+  }, [user?.etsyConnected]);
 
   // Global Ctrl+K / Cmd+K listener
   useEffect(() => {
@@ -388,6 +402,37 @@ const AppLayout = ({ children }) => {
           margin: '24px',
           minHeight: 'calc(100vh - 112px)',
         }}>
+          {needsReauth && (
+            <Alert
+              type="warning"
+              showIcon
+              icon={<WarningOutlined />}
+              message="Your Etsy shop connection has expired"
+              description={
+                <span>
+                  Please re-authorize to continue using shop tools.{' '}
+                  <a
+                    href="#reauth"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      try {
+                        const res = await etsyApi.getAuthUrl();
+                        if (res.success && res.data?.authUrl) {
+                          window.location.href = res.data.authUrl;
+                        }
+                      } catch { /* silently fail */ }
+                    }}
+                    style={{ fontWeight: 600, color: BRAND }}
+                  >
+                    Re-authorize now →
+                  </a>
+                </span>
+              }
+              style={{ marginBottom: 16, borderRadius: 12 }}
+              closable
+              onClose={() => setNeedsReauth(false)}
+            />
+          )}
           {children}
         </Content>
       </Layout>
