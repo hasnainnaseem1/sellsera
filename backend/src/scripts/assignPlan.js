@@ -66,6 +66,8 @@ async function main() {
     assignedBy: null,
   };
   user.subscriptionStatus = 'active';
+  user.trialEndsAt = null;
+  user.trialWarningEmailSent = false;
   user.subscriptionExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
   user.monthlyResetDate = new Date();
 

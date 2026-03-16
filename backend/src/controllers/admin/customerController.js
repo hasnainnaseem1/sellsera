@@ -1134,18 +1134,13 @@ const assignCustomerPlan = async (req, res) => {
     customer.subscriptionStartDate = now;
     customer.monthlyResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    if (plan.trialDays && plan.trialDays > 0) {
-      // Plan has a trial period
-      customer.subscriptionStatus = 'trial';
-      customer.trialEndsAt = new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000);
-      customer.subscriptionExpiresAt = customer.trialEndsAt;
-    } else {
-      // No trial — direct active subscription
-      customer.subscriptionStatus = 'active';
-      customer.trialEndsAt = null;
-      // For free plans (price=0), no expiry. For paid plans, expiry handled by payment system.
-      customer.subscriptionExpiresAt = null;
-    }
+    // Admin-assigned plans are always immediately active — no trial period.
+    // Trials are only for user-initiated signups via the payment gateway.
+    customer.subscriptionStatus = plan.price?.monthly === 0 ? 'active' : 'active';
+    customer.trialEndsAt = null;
+    customer.trialWarningEmailSent = false;
+    // For free plans set no expiry; for paid plans expiry is handled by payment system.
+    customer.subscriptionExpiresAt = plan.price?.monthly === 0 ? null : new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
     await safeSave(customer);
 

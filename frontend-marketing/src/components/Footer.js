@@ -126,9 +126,15 @@ function Footer() {
         </div>
 
         {/* Divider + bottom */}
-        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-3">
-          <p className="text-gray-600 text-xs">&copy; {year} {brandName}. All rights reserved.</p>
-          <p className="text-gray-700 text-xs">{brandName} is not affiliated with or endorsed by Etsy, Inc.</p>
+        <div className="border-t border-gray-800 pt-8 flex flex-col gap-3">
+          {/* Etsy Required Trademark Disclosure */}
+          <p className="text-gray-500 text-xs text-center">
+            The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
+          </p>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2">
+            <p className="text-gray-600 text-xs">&copy; {year} {brandName}. All rights reserved.</p>
+            <p className="text-gray-700 text-xs">{brandName} is independently developed and not affiliated with Etsy, Inc.</p>
+          </div>
         </div>
       </div>
     </footer>
