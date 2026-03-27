@@ -119,11 +119,11 @@ const SignupPage = () => {
   };
 
   const pageStyle = {
-    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+    minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
     background: isDark
       ? "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)"
       : "linear-gradient(135deg, #f0f0ff 0%, #e8e4ff 50%, #EDE9FE 100%)",
-    padding: "32px 24px", position: "relative",
+    padding: "32px 24px 0", position: "relative",
   };
   const cardStyle = {
     width: "100%", maxWidth: 480, background: tok.colorBgContainer,
@@ -262,22 +262,23 @@ const SignupPage = () => {
         </div>
       </div>
 
-      {/* Legal footer — Etsy API TOS §1 & §2 compliance */}
+      {/* Legal footer — Etsy API TOS §2 compliance */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        textAlign: 'center', padding: '16px 24px',
+        width: '100%', maxWidth: 540,
+        textAlign: 'center', padding: '20px 24px',
+        marginTop: 24,
       }}>
-        <div style={{ marginBottom: 6 }}>
+        <div style={{ marginBottom: 8 }}>
           <a href={`${config.marketingUrl}/privacy`} target="_blank" rel="noreferrer"
-            style={{ color: isDark ? '#8888a8' : '#999', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Privacy Policy</a>
+            style={{ color: isDark ? '#9999b8' : '#777', fontSize: 13, marginRight: 20, textDecoration: 'none' }}>Privacy Policy</a>
           <a href={`${config.marketingUrl}/terms`} target="_blank" rel="noreferrer"
-            style={{ color: isDark ? '#8888a8' : '#999', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Terms of Service</a>
+            style={{ color: isDark ? '#9999b8' : '#777', fontSize: 13, marginRight: 20, textDecoration: 'none' }}>Terms of Service</a>
           {siteConfig?.contactEmail && (
             <a href={`mailto:${siteConfig.contactEmail}`}
-              style={{ color: isDark ? '#8888a8' : '#999', fontSize: 12, textDecoration: 'none' }}>{siteConfig.contactEmail}</a>
+              style={{ color: isDark ? '#9999b8' : '#777', fontSize: 13, textDecoration: 'none' }}>{siteConfig.contactEmail}</a>
           )}
         </div>
-        <Text style={{ fontSize: 10, color: isDark ? '#555570' : '#bbb' }}>
+        <Text style={{ fontSize: 12, color: isDark ? '#8888a8' : '#888' }}>
           The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
         </Text>
       </div>

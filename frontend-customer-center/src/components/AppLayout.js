@@ -405,13 +405,13 @@ const AppLayout = ({ children }) => {
           {/* Etsy Required Trademark Disclosure — rendered once at app level */}
           <div style={{
             textAlign: 'center',
-            padding: '6px 16px',
+            padding: '8px 16px',
             marginBottom: 16,
             borderRadius: 8,
-            background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
           }}>
-            <Text style={{ fontSize: 11, color: isDark ? '#666680' : '#aaaabc' }}>
+            <Text style={{ fontSize: 12, color: isDark ? '#8888a8' : '#888' }}>
               The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
             </Text>
           </div>
@@ -449,7 +449,7 @@ const AppLayout = ({ children }) => {
           {children}
         </Content>
 
-        {/* ── Legal Footer — Etsy API TOS §1 & §2 compliance ── */}
+        {/* ── Legal Footer — Etsy API TOS §2 compliance ── */}
         <div style={{
           textAlign: 'center',
           padding: '12px 24px 16px',
@@ -458,16 +458,16 @@ const AppLayout = ({ children }) => {
           <div style={{ marginBottom: 4 }}>
             <a href={siteConfig?.marketingUrl ? `${siteConfig.marketingUrl}/privacy` : '/privacy'}
               target="_blank" rel="noreferrer"
-              style={{ color: isDark ? '#6a6a8a' : '#aaa', fontSize: 11, marginRight: 16, textDecoration: 'none' }}>Privacy Policy</a>
+              style={{ color: isDark ? '#8888a8' : '#888', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Privacy Policy</a>
             <a href={siteConfig?.marketingUrl ? `${siteConfig.marketingUrl}/terms` : '/terms'}
               target="_blank" rel="noreferrer"
-              style={{ color: isDark ? '#6a6a8a' : '#aaa', fontSize: 11, marginRight: 16, textDecoration: 'none' }}>Terms of Service</a>
+              style={{ color: isDark ? '#8888a8' : '#888', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Terms of Service</a>
             {siteConfig?.contactEmail && (
               <a href={`mailto:${siteConfig.contactEmail}`}
-                style={{ color: isDark ? '#6a6a8a' : '#aaa', fontSize: 11, textDecoration: 'none' }}>{siteConfig.contactEmail}</a>
+                style={{ color: isDark ? '#8888a8' : '#888', fontSize: 12, textDecoration: 'none' }}>{siteConfig.contactEmail}</a>
             )}
           </div>
-          <Text style={{ fontSize: 10, color: isDark ? '#444460' : '#ccc' }}>
+          <Text style={{ fontSize: 11, color: isDark ? '#666680' : '#aaa' }}>
             &copy; {new Date().getFullYear()} {siteConfig?.siteName || 'Sellsera'}. All rights reserved.
           </Text>
         </div>

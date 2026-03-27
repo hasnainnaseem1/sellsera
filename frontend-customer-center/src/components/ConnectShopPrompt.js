@@ -99,7 +99,7 @@ const ConnectShopPrompt = ({ onConnect }) => {
 
       {/* Etsy API TOS §2 — required trademark disclaimer */}
       <div style={{ marginTop: 24 }}>
-        <Text style={{ fontSize: 10, color: colors.muted, lineHeight: 1.5 }}>
+        <Text style={{ fontSize: 12, color: colors.muted, lineHeight: 1.5 }}>
           The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
         </Text>
       </div>
