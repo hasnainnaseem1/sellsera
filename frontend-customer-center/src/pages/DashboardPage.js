@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  Row, Col, Card, Statistic, Button, Typography,
+  Row, Col, Card, Button, Typography,
   Tag, Progress, theme, Alert, Space, List, Empty, message,
   Modal, Tooltip, Spin,
 } from "antd";
@@ -10,7 +10,7 @@ import {
   SyncOutlined, SearchOutlined, KeyOutlined,
   TeamOutlined, HistoryOutlined, EyeOutlined, LockOutlined,
   ShopOutlined, DisconnectOutlined, ExportOutlined,
-  CheckCircleOutlined, UnorderedListOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../components/AppLayout";
@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSite } from "../context/SiteContext";
 import { usePermissions } from "../context/PermissionsContext";
+import { useShop } from "../context/ShopContext";
 import { colors, radii } from "../theme/tokens";
 import analysisApi from "../api/analysisApi";
 import etsyApi from "../api/etsyApi";
@@ -33,19 +34,15 @@ const DashboardPage = () => {
   const { isDark } = useTheme();
   const { siteConfig } = useSite();
   const { getFeatureAccess } = usePermissions();
+  const { shops, activeShop, activeShopId, shopLimit, shopLimitUnlimited, loading: shopLoading, selectShop, refresh: refreshShops } = useShop();
   const { token: tok } = theme.useToken();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [recentAnalyses, setRecentAnalyses] = useState([]);
   const [shopSyncing, setShopSyncing] = useState(false);
-  const [shops, setShops] = useState([]);
-  const [shopLimit, setShopLimit] = useState(1);
-  const [shopLimitUnlimited, setShopLimitUnlimited] = useState(false);
-  const [shopLoading, setShopLoading] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(null); // shopId being disconnected
-  const [syncingShop, setSyncingShop] = useState(null); // shopId being synced
-  const [shopRefreshKey, setShopRefreshKey] = useState(0); // bump to force shop list refresh
+  const [disconnecting, setDisconnecting] = useState(null);
+  const [syncingShop, setSyncingShop] = useState(null);
 
   const subStatus = user?.subscriptionStatus || "inactive";
   const trialEndsAt = user?.trialEndsAt ? new Date(user.trialEndsAt) : null;
@@ -60,7 +57,7 @@ const DashboardPage = () => {
       message.success(`Etsy shop${shopName ? ` "${shopName}"` : ''} connected! Syncing your data...`);
       setShopSyncing(true);
       fetchMe(token);
-      setShopRefreshKey(k => k + 1); // force shop list re-fetch after OAuth
+      refreshShops();
       setSearchParams({}, { replace: true });
     } else if (etsyError) {
       const errorMessages = {
@@ -74,28 +71,6 @@ const DashboardPage = () => {
 
   // Determine if user has connected their shop
   const hasShop = !!user?.etsyConnected;
-
-  // Fetch all connected shops
-  const fetchShops = () => {
-    setShopLoading(true);
-    etsyApi.getShopInfo()
-      .then(res => {
-        if (res.success && res.data) {
-          // Handle both new format (shops[]) and legacy format (shop{})
-          const shopsList = res.data.shops
-            || (res.data.shop ? [{ id: res.data.shop.shopId, ...res.data.shop }] : []);
-          setShops(shopsList);
-          setShopLimit(res.data.shopLimit ?? 1);
-          setShopLimitUnlimited(res.data.shopLimitUnlimited || false);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setShopLoading(false));
-  };
-
-  useEffect(() => {
-    if (hasShop) fetchShops();
-  }, [hasShop, shopRefreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const card = {
     border: `1px solid ${isDark ? "#2e2e4a" : "#ebebf8"}`,
@@ -124,7 +99,7 @@ const DashboardPage = () => {
           const res = await etsyApi.disconnect(shop.id);
           if (res.success) {
             message.success(`"${shop.shopName}" disconnected`);
-            setShops(prev => prev.filter(s => s.id !== shop.id));
+            refreshShops();
             fetchMe(token);
           }
         } catch {
@@ -143,7 +118,7 @@ const DashboardPage = () => {
       const res = await etsyApi.syncShop(shop.id);
       if (res.success) {
         message.success(res.message || `"${shop.shopName}" synced!`);
-        fetchShops(); // refresh shop list with updated counts
+        refreshShops(); // refresh shop list with updated counts
       } else {
         message.error(res.message || 'Sync failed');
       }
@@ -223,8 +198,6 @@ const DashboardPage = () => {
     );
   }
 
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
-
   return (
     <AppLayout>
       {/* Trial / Expired Alert */}
@@ -267,147 +240,161 @@ const DashboardPage = () => {
         </Text>
       </Card>
 
-      {/* Connected Shops Manager */}
-      <Card
-        style={{ ...card, marginBottom: 24 }}
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <Space>
-              <ShopOutlined style={{ color: BRAND }} />
-              <Text strong>Connected Shops</Text>
-              <Tag color={isDark ? '#2e2e4a' : '#f0f0ff'} style={{ color: BRAND, fontWeight: 600, border: 'none' }}>
-                {shops.length}{shopLimitUnlimited ? '' : ` / ${shopLimit || 1}`}
-              </Tag>
-            </Space>
-            <Button
-              type="primary"
-              size="small"
-              icon={<ShopOutlined />}
-              onClick={handleAddShop}
-              disabled={!shopLimitUnlimited && shops.length >= shopLimit}
-              style={{
-                background: `linear-gradient(135deg, ${BRAND}, #A78BFA)`,
-                border: 'none', fontWeight: 600,
-                boxShadow: '0 2px 8px rgba(108,99,255,0.25)',
-              }}
-            >
-              Add Shop
-            </Button>
+      {/* ── Connected Shops Manager ────────────────────────────────── */}
+      <div style={{ marginBottom: 24 }}>
+        {/* Header row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <ShopOutlined style={{ color: BRAND, fontSize: 16 }} />
+            <Text strong style={{ fontSize: 15 }}>Connected Shops</Text>
+            <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>
+              {shops.length}{shopLimitUnlimited ? '' : ` / ${shopLimit}`}
+            </Text>
           </div>
-        }
-        styles={{ body: { padding: 0 } }}
-      >
+          <Button
+            type="text"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={handleAddShop}
+            disabled={!shopLimitUnlimited && shops.length >= shopLimit}
+            style={{ color: BRAND, fontWeight: 600 }}
+          >
+            Add Shop
+          </Button>
+        </div>
+
+        {/* Slim quota bar */}
+        {!shopLimitUnlimited && (
+          <Progress
+            percent={Math.round((shops.length / Math.max(shopLimit, 1)) * 100)}
+            showInfo={false}
+            size="small"
+            strokeColor={BRAND}
+            trailColor={isDark ? '#2e2e4a' : '#ebebf8'}
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        {/* Shop rows */}
         {shopLoading ? (
           <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>
         ) : shops.length > 0 ? (
-          shops.map((shop, idx) => (
-            <div
-              key={shop.id}
-              style={{
-                display: 'flex', alignItems: 'stretch', flexWrap: 'wrap',
-                borderBottom: idx < shops.length - 1 ? `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}` : 'none',
-              }}
-            >
-              {/* Shop icon + name */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 16,
-                padding: '16px 24px', flex: '1 1 auto', minWidth: 240,
-              }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  background: `linear-gradient(135deg, #F97316, #FB923C)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  <ShopOutlined style={{ fontSize: 20, color: '#fff' }} />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Text strong style={{ fontSize: 15 }}>{shop.shopName}</Text>
-                    <Tag
-                      icon={<CheckCircleOutlined />}
-                      color="success"
-                      style={{ borderRadius: 12, fontSize: 11, fontWeight: 600 }}
-                    >
-                      Connected
-                    </Tag>
+          <div style={{
+            border: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
+            borderRadius: radii.lg,
+            background: tok.colorBgContainer,
+            overflow: 'hidden',
+          }}>
+            {shops.map((shop, idx) => {
+              const isActive = activeShop?.id === shop.id;
+              return (
+                <div
+                  key={shop.id}
+                  onClick={() => selectShop(shop.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '12px 20px',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                    borderBottom: idx < shops.length - 1 ? `1px solid ${isDark ? '#2e2e4a' : '#f0f0f5'}` : 'none',
+                    background: isActive
+                      ? (isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.04)')
+                      : 'transparent',
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = isActive
+                      ? (isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.04)')
+                      : 'transparent';
+                  }}
+                >
+                  {/* Avatar */}
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: `linear-gradient(135deg, ${BRAND}, ${colors.brandLight})`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: isActive ? `0 0 0 2px ${BRAND}33` : 'none',
+                  }}>
+                    <ShopOutlined style={{ fontSize: 16, color: '#fff' }} />
                   </div>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Connected {formatDate(shop.createdAt)}
-                    {shop.lastSyncAt && <> · Last synced {formatDate(shop.lastSyncAt)}</>}
+
+                  {/* Name + active indicator */}
+                  <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Text strong style={{ fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {shop.shopName}
+                      </Text>
+                      {isActive && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 11, fontWeight: 600, color: colors.success,
+                        }}>
+                          <span style={{
+                            width: 6, height: 6, borderRadius: '50%',
+                            background: colors.success, display: 'inline-block',
+                          }} />
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compact stats */}
+                  <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {shop.listingCount ?? 0} listings · {shop.totalSales ?? 0} sales
                   </Text>
-                </div>
-              </div>
 
-              {/* Shop stats */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 32,
-                padding: '16px 24px',
-                borderLeft: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
-                flexShrink: 0,
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Listings</Text>
-                  <Text strong style={{ fontSize: 18, color: BRAND }}>{shop.listingCount ?? '—'}</Text>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Sales</Text>
-                  <Text strong style={{ fontSize: 18, color: colors.success }}>{shop.totalSales ?? '—'}</Text>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '16px 24px',
-                borderLeft: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
-                flexShrink: 0,
-              }}>
-                <Tooltip title="Sync listings from Etsy">
-                  <Button
-                    icon={<SyncOutlined spin={syncingShop === shop.id} />}
-                    loading={syncingShop === shop.id}
-                    onClick={() => handleSync(shop)}
-                    size="small"
+                  {/* Action icons — ghost style */}
+                  <div
+                    className="shop-row-actions"
+                    style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, opacity: 0.45, transition: 'opacity 0.15s' }}
+                    onClick={e => e.stopPropagation()}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 0.45}
                   >
-                    Sync
-                  </Button>
-                </Tooltip>
-                <Tooltip title="View listings">
-                  <Button
-                    icon={<UnorderedListOutlined />}
-                    onClick={() => navigate(`/listings/active?shopId=${shop.id}`)}
-                    size="small"
-                  >
-                    Listings
-                  </Button>
-                </Tooltip>
-                <Tooltip title="View on Etsy">
-                  <Button
-                    icon={<ExportOutlined />}
-                    href={`https://www.etsy.com/shop/${shop.shopName}`}
-                    target="_blank"
-                    size="small"
-                  />
-                </Tooltip>
-                <Tooltip title="Disconnect shop">
-                  <Button
-                    danger
-                    icon={<DisconnectOutlined />}
-                    loading={disconnecting === shop.id}
-                    onClick={() => handleDisconnect(shop)}
-                    size="small"
-                  />
-                </Tooltip>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div style={{ padding: '20px 24px', textAlign: 'center' }}>
-            <Text type="secondary">No shops connected yet</Text>
+                    <Tooltip title="Sync listings">
+                      <Button
+                        type="text" size="small"
+                        icon={<SyncOutlined spin={syncingShop === shop.id} />}
+                        loading={syncingShop === shop.id}
+                        onClick={() => handleSync(shop)}
+                        style={{ color: tok.colorTextSecondary }}
+                      />
+                    </Tooltip>
+                    <Tooltip title="View on Etsy">
+                      <Button
+                        type="text" size="small"
+                        icon={<ExportOutlined />}
+                        href={`https://www.etsy.com/shop/${shop.shopName}`}
+                        target="_blank"
+                        style={{ color: tok.colorTextSecondary }}
+                      />
+                    </Tooltip>
+                    <Tooltip title="Disconnect">
+                      <Button
+                        type="text" size="small" danger
+                        icon={<DisconnectOutlined />}
+                        loading={disconnecting === shop.id}
+                        onClick={() => handleDisconnect(shop)}
+                      />
+                    </Tooltip>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        ) : (
+          <Card style={{ ...card, textAlign: 'center', padding: '20px 0' }}>
+            <Text type="secondary">No shops connected yet</Text>
+          </Card>
         )}
-      </Card>
+      </div>
 
       {/* Command Center — Feature Action Cards */}
       <Title level={4} style={{ marginBottom: 16 }}>

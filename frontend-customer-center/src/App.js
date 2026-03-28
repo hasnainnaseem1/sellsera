@@ -31,6 +31,7 @@ import DeliveryStatusPage from './pages/DeliveryStatusPage';
 import SalesMapPage from './pages/SalesMapPage';
 import UsageQuotasPage from './pages/UsageQuotasPage';
 import { PermissionsProvider } from './context/PermissionsContext';
+import { ShopProvider } from './context/ShopContext';
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 const BRAND_PRIMARY = '#6C63FF';
@@ -162,7 +163,9 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <PermissionsProvider>
-            <AppWithTheme />
+            <ShopProvider>
+              <AppWithTheme />
+            </ShopProvider>
           </PermissionsProvider>
         </AuthProvider>
       </ThemeProvider>
