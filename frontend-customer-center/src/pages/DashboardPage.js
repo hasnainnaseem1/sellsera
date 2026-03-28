@@ -45,6 +45,7 @@ const DashboardPage = () => {
   const [shopLoading, setShopLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(null); // shopId being disconnected
   const [syncingShop, setSyncingShop] = useState(null); // shopId being synced
+  const [shopRefreshKey, setShopRefreshKey] = useState(0); // bump to force shop list refresh
 
   const subStatus = user?.subscriptionStatus || "inactive";
   const trialEndsAt = user?.trialEndsAt ? new Date(user.trialEndsAt) : null;
@@ -59,6 +60,7 @@ const DashboardPage = () => {
       message.success(`Etsy shop${shopName ? ` "${shopName}"` : ''} connected! Syncing your data...`);
       setShopSyncing(true);
       fetchMe(token);
+      setShopRefreshKey(k => k + 1); // force shop list re-fetch after OAuth
       setSearchParams({}, { replace: true });
     } else if (etsyError) {
       const errorMessages = {
@@ -74,21 +76,26 @@ const DashboardPage = () => {
   const hasShop = !!user?.etsyConnected;
 
   // Fetch all connected shops
+  const fetchShops = () => {
+    setShopLoading(true);
+    etsyApi.getShopInfo()
+      .then(res => {
+        if (res.success && res.data) {
+          // Handle both new format (shops[]) and legacy format (shop{})
+          const shopsList = res.data.shops
+            || (res.data.shop ? [{ id: res.data.shop.shopId, ...res.data.shop }] : []);
+          setShops(shopsList);
+          setShopLimit(res.data.shopLimit ?? 1);
+          setShopLimitUnlimited(res.data.shopLimitUnlimited || false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setShopLoading(false));
+  };
+
   useEffect(() => {
-    if (hasShop) {
-      setShopLoading(true);
-      etsyApi.getShopInfo()
-        .then(res => {
-          if (res.success && res.data) {
-            setShops(res.data.shops || []);
-            setShopLimit(res.data.shopLimit);
-            setShopLimitUnlimited(res.data.shopLimitUnlimited || false);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setShopLoading(false));
-    }
-  }, [hasShop]);
+    if (hasShop) fetchShops();
+  }, [hasShop, shopRefreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const card = {
     border: `1px solid ${isDark ? "#2e2e4a" : "#ebebf8"}`,
@@ -136,11 +143,7 @@ const DashboardPage = () => {
       const res = await etsyApi.syncShop(shop.id);
       if (res.success) {
         message.success(res.message || `"${shop.shopName}" synced!`);
-        // Refresh shop list to get updated listing count
-        const shopRes = await etsyApi.getShopInfo();
-        if (shopRes.success && shopRes.data) {
-          setShops(shopRes.data.shops || []);
-        }
+        fetchShops(); // refresh shop list with updated counts
       } else {
         message.error(res.message || 'Sync failed');
       }
@@ -273,7 +276,7 @@ const DashboardPage = () => {
               <ShopOutlined style={{ color: BRAND }} />
               <Text strong>Connected Shops</Text>
               <Tag color={isDark ? '#2e2e4a' : '#f0f0ff'} style={{ color: BRAND, fontWeight: 600, border: 'none' }}>
-                {shops.length}{shopLimitUnlimited ? '' : ` / ${shopLimit}`}
+                {shops.length}{shopLimitUnlimited ? '' : ` / ${shopLimit || 1}`}
               </Tag>
             </Space>
             <Button

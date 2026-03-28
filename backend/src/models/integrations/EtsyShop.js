@@ -118,4 +118,18 @@ etsyShopSchema.methods.reauthorize = function (accessToken_enc, refreshToken_enc
 
 const EtsyShop = mongoose.model('EtsyShop', etsyShopSchema);
 
+// Auto-migrate: drop old unique userId-only index if it exists (multi-shop upgrade)
+EtsyShop.collection.indexes()
+  .then(indexes => {
+    const oldUniqueIdx = indexes.find(
+      idx => idx.key?.userId === 1 && idx.unique === true && !idx.key?.shopId
+    );
+    if (oldUniqueIdx) {
+      console.log(`[EtsyShop] Dropping old unique userId index: ${oldUniqueIdx.name}`);
+      return EtsyShop.collection.dropIndex(oldUniqueIdx.name);
+    }
+  })
+  .then(() => {})
+  .catch(() => {}); // Silently ignore — collection may not exist yet
+
 module.exports = EtsyShop;

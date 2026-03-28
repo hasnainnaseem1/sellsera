@@ -135,7 +135,6 @@ function Footer() {
             <p className="text-gray-600 text-xs">&copy; {year} {brandName}. All rights reserved.</p>
             <p className="text-gray-400 text-xs">{brandName} is independently developed and not affiliated with Etsy, Inc.</p>
           </div>
-          </div>
         </div>
       </div>
     </footer>
