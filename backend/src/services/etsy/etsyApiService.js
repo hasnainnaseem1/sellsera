@@ -46,7 +46,7 @@ const publicRequest = async (method, path, options = {}) => {
     const response = await fetch(url, {
       method,
       headers: {
-        'x-api-key': key.apiKey,
+        'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
         'Content-Type': 'application/json',
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
@@ -114,7 +114,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     let response = await fetch(url, {
       method,
       headers: {
-        'x-api-key': key.sharedSecret,
+        'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
@@ -136,7 +136,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
       response = await fetch(url, {
         method,
         headers: {
-          'x-api-key': key.sharedSecret,
+          'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
           'Authorization': `Bearer ${refreshResult.accessToken}`,
           'Content-Type': 'application/json',
         },
