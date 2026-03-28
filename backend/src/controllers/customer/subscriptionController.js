@@ -4,6 +4,7 @@
  * Handles customer subscription info and usage queries.
  */
 const { getRemainingUsage } = require('../../services/subscription/usageService');
+const { Plan } = require('../../models/subscription');
 
 /**
  * Get current customer's subscription & plan info
@@ -12,14 +13,27 @@ const getSubscription = async (req, res) => {
   try {
     const user = req.user;
 
+    // Fetch live plan for up-to-date limits
+    let livePlanFeatures = null;
+    const planId = user.planSnapshot?.planId;
+    if (planId) {
+      const livePlan = await Plan.findById(planId).select('features').lean();
+      livePlanFeatures = livePlan?.features || null;
+    }
+
     const planFeatures = (user.planSnapshot?.features || [])
       .filter((f) => f.enabled)
-      .map((f) => ({
-        featureKey: f.featureKey,
-        featureName: f.featureName,
-        type: f.limit !== null && f.limit !== undefined ? 'numeric' : 'boolean',
-        limit: f.limit,
-      }));
+      .map((f) => {
+        // Use live plan limit if available
+        const liveFeature = livePlanFeatures?.find(lf => lf.featureKey === f.featureKey);
+        const limit = liveFeature?.limit !== undefined ? liveFeature.limit : f.limit;
+        return {
+          featureKey: f.featureKey,
+          featureName: f.featureName,
+          type: limit !== null && limit !== undefined ? 'numeric' : 'boolean',
+          limit,
+        };
+      });
 
     res.json({
       success: true,

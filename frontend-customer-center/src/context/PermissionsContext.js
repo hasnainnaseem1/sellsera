@@ -49,12 +49,16 @@ export const PermissionsProvider = ({ children }) => {
         };
       });
 
-      // Merge usage data
+      // Merge usage data (including live limits)
       usageList.forEach(u => {
         if (featureMap[u.featureKey]) {
           featureMap[u.featureKey].used      = u.used || 0;
           featureMap[u.featureKey].remaining  = u.remaining;
           featureMap[u.featureKey].unlimited  = u.unlimited || false;
+          // Update limit from usage response (has live plan data)
+          if (u.limit !== undefined) {
+            featureMap[u.featureKey].limit = u.limit;
+          }
         }
       });
 
