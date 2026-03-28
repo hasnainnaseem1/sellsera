@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const session = require('express-session');
 const path = require('path');
 const { getAppInfo } = require('./utils/helpers');
 require('dotenv').config();
@@ -29,20 +28,6 @@ app.use('/api/v1/webhooks/lemonsqueezy', express.raw({ type: 'application/json' 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Session middleware — kept for legacy compatibility, not used for OAuth state
-// (OAuth state is stored in MongoDB via EtsyOAuthState model)
-app.use(session({
-  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  name: 'sellsera.sid',
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 10 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
-  },
-}));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

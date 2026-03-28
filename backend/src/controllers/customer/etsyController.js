@@ -181,13 +181,13 @@ const disconnectShop = async (req, res) => {
  */
 const getListings = async (req, res) => {
   try {
-    const shop = await EtsyShop.findOne({ userId: req.userId }).select('shopId');
+    const shop = await EtsyShop.findOne({ userId: req.userId }).select('_id');
     if (!shop) {
       return res.json({ success: true, data: { listings: [], total: 0 } });
     }
 
     const { page = 1, limit = 50, search, status } = req.query;
-    const query = { shopId: shop.shopId };
+    const query = { shopId: shop._id };
     if (status) query.state = status;
     if (search) query.title = { $regex: search, $options: 'i' };
 

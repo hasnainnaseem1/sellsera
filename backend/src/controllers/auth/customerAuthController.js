@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const { User } = require('../../models/user');
+const { EtsyShop } = require('../../models/integrations');
 const { ActivityLog, AdminSettings } = require('../../models/admin');
 const { Notification } = require('../../models/notification');
 const { Plan } = require('../../models/subscription');
@@ -875,6 +876,10 @@ const getMe = async (req, res) => {
       });
     }
 
+    // Check if user has a connected Etsy shop
+    const etsyShop = await EtsyShop.findOne({ userId: user._id }).select('_id status').lean();
+    const etsyConnected = !!etsyShop && etsyShop.status !== 'disconnected';
+
     res.json({
       success: true,
       user: {
@@ -894,6 +899,7 @@ const getMe = async (req, res) => {
         subscriptionExpiresAt: user.subscriptionExpiresAt || null,
         billingCycle: user.billingCycle || 'none',
         trialEndsAt: user.trialEndsAt || null,
+        etsyConnected,
         isEmailVerified: user.isEmailVerified,
         status: user.status,
         lastLogin: user.lastLogin,
