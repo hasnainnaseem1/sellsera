@@ -231,6 +231,10 @@ const googleSSO = async (req, res) => {
     const ssoSecSettings = await getSecuritySettings();
     const token = generateToken(user._id, ssoSecSettings.sessionTimeout);
 
+    // Check if user has connected Etsy shop
+    const ssoEtsyShop = await EtsyShop.findOne({ userId: user._id }).select('_id status').lean();
+    const ssoEtsyConnected = !!ssoEtsyShop && ssoEtsyShop.status !== 'disconnected';
+
     res.json({
       success: true,
       message: isNewUser ? 'Account created successfully!' : 'Login successful',
@@ -245,6 +249,7 @@ const googleSSO = async (req, res) => {
         analysisCount: user.analysisCount,
         analysisLimit: user.analysisLimit,
         subscriptionStatus: user.subscriptionStatus,
+        etsyConnected: ssoEtsyConnected,
         isEmailVerified: user.isEmailVerified,
       },
     });
@@ -644,6 +649,10 @@ const login = async (req, res) => {
 
     const token = generateToken(user._id, secSettings.sessionTimeout);
 
+    // Check if user has connected Etsy shop
+    const loginEtsyShop = await EtsyShop.findOne({ userId: user._id }).select('_id status').lean();
+    const loginEtsyConnected = !!loginEtsyShop && loginEtsyShop.status !== 'disconnected';
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -662,6 +671,7 @@ const login = async (req, res) => {
         monthlyResetDate: user.monthlyResetDate,
         subscriptionStatus: user.subscriptionStatus,
         trialEndsAt: user.trialEndsAt || null,
+        etsyConnected: loginEtsyConnected,
         isEmailVerified: user.isEmailVerified,
         status: user.status,
         lastLogin: user.lastLogin,

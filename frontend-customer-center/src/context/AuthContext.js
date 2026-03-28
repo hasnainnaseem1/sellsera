@@ -40,6 +40,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    // Immediately fetch full user profile (includes etsyConnected, etc.)
+    fetchMe(newToken);
   };
 
   const logout = () => {
