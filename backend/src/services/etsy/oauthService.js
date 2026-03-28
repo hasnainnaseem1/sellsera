@@ -142,10 +142,18 @@ const exchangeCodeForTokens = async (code, codeVerifier) => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error_description || 'Failed to exchange authorization code');
+    console.error(`[${new Date().toISOString()}] [EtsyOAuth] Token exchange failed:`, response.status, JSON.stringify(error));
+    throw new Error(error.error_description || `Token exchange failed (HTTP ${response.status})`);
   }
 
   const tokenData = await response.json();
+
+  if (!tokenData.access_token) {
+    console.error(`[${new Date().toISOString()}] [EtsyOAuth] Token response missing access_token:`, JSON.stringify(tokenData));
+    throw new Error('Etsy returned no access token');
+  }
+
+  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Token exchange success — token_type: ${tokenData.token_type}, expires_in: ${tokenData.expires_in}, has_access_token: ${!!tokenData.access_token}, has_refresh_token: ${!!tokenData.refresh_token}`);
 
   return {
     accessToken: tokenData.access_token,
@@ -163,6 +171,8 @@ const exchangeCodeForTokens = async (code, codeVerifier) => {
 const fetchShopInfo = async (accessToken) => {
   const config = await getEtsyConfig();
 
+  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Calling /users/me with x-api-key: ${config.clientId.substring(0, 8)}...`);
+
   // First get the Etsy user ID
   const meResponse = await fetch('https://openapi.etsy.com/v3/application/users/me', {
     headers: {
@@ -172,7 +182,9 @@ const fetchShopInfo = async (accessToken) => {
   });
 
   if (!meResponse.ok) {
-    throw new Error('Failed to fetch Etsy user info');
+    const errBody = await meResponse.text().catch(() => '');
+    console.error(`[${new Date().toISOString()}] [EtsyOAuth] /users/me failed:`, meResponse.status, errBody);
+    throw new Error(`Failed to fetch Etsy user info (HTTP ${meResponse.status})`);
   }
 
   const meData = await meResponse.json();
@@ -187,6 +199,8 @@ const fetchShopInfo = async (accessToken) => {
   });
 
   if (!shopResponse.ok) {
+    const errBody = await shopResponse.text().catch(() => '');
+    console.error(`[${new Date().toISOString()}] [EtsyOAuth] /shops failed:`, shopResponse.status, errBody);
     throw new Error('Failed to fetch Etsy shop info. Make sure you have an active Etsy shop.');
   }
 

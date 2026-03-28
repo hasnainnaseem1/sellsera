@@ -29,7 +29,8 @@ app.use('/api/v1/webhooks/lemonsqueezy', express.raw({ type: 'application/json' 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Session middleware — required for Etsy OAuth PKCE flow (stores code verifier between auth & callback)
+// Session middleware — kept for legacy compatibility, not used for OAuth state
+// (OAuth state is stored in MongoDB via EtsyOAuthState model)
 app.use(session({
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
   resave: false,
@@ -38,7 +39,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 10 * 60 * 1000, // 10 minutes — only needed for OAuth handshake
+    maxAge: 10 * 60 * 1000,
     sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
   },
 }));

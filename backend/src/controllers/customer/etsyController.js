@@ -34,7 +34,7 @@ const initiateAuth = async (req, res) => {
       data: { authUrl },
     });
   } catch (error) {
-    console.error('Etsy auth initiation error:', error.message);
+    console.error(`[${new Date().toISOString()}] Etsy auth initiation error:`, error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to initiate Etsy authorization',
@@ -93,7 +93,7 @@ const handleCallback = async (req, res) => {
     return res.redirect(`${frontendUrl}/dashboard?etsy_connected=true&shop=${encodeURIComponent(etsyShop.shopName)}`);
 
   } catch (error) {
-    console.error('Etsy OAuth callback error:', error.message);
+    console.error(`[${new Date().toISOString()}] Etsy OAuth callback error:`, error.message);
     const frontendUrl = process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002';
     return res.redirect(`${frontendUrl}/dashboard?etsy_error=connection_failed`);
   }
