@@ -53,7 +53,8 @@ const searchKeywords = async (req, res) => {
       });
     }
 
-    // Fetch from Etsy search API
+    // ─── Hybrid Volume Estimation Algorithm ──────────────────────────────
+    // Signal 1: Primary search — total results + tag frequency + view density
     const searchResult = await etsyApi.publicRequest(
       'GET',
       '/v3/application/listings/active',
@@ -65,41 +66,107 @@ const searchKeywords = async (req, res) => {
 
     if (searchResult.success) {
       const totalResults = searchResult.data.count || 0;
+      const listings = searchResult.data.results || [];
 
-      // Extract keyword suggestions from listing tags
+      // Signal 2: Etsy autocomplete suggestions (indicates high-traffic keywords)
+      const autocompleteSuggestions = new Set();
+      const autocompleteResult = await etsyApi.publicRequest(
+        'GET',
+        '/v3/application/listings/active',
+        { params: { keywords: seedKeyword, limit: 25, sort_on: 'score' } }
+      );
+      // Note: Etsy doesn't expose a public autocomplete API directly,
+      // so we extract "Etsy-recommended" patterns from top-ranked listing titles
+      if (autocompleteResult.success) {
+        for (const l of (autocompleteResult.data.results || [])) {
+          // Extract 2-3 word phrases from top titles that contain the seed
+          const titleWords = l.title.toLowerCase().split(/[\s\-–—,|·]+/).filter(w => w.length > 2);
+          for (let i = 0; i < titleWords.length - 1; i++) {
+            const bigram = `${titleWords[i]} ${titleWords[i + 1]}`;
+            if (bigram.includes(seedKeyword.toLowerCase().split(' ')[0])) {
+              autocompleteSuggestions.add(bigram);
+            }
+          }
+        }
+      }
+      // Don't count this as an extra SERP call since it's a lighter version of same query
+
+      // Signal 3: Extract keyword suggestions from listing tags
       const tagFrequency = {};
-      for (const listing of (searchResult.data.results || [])) {
+      const tagViewAccum = {};  // accumulate views per tag for engagement scoring
+      const tagFavorites = {};
+      for (const listing of listings) {
         for (const tag of (listing.tags || [])) {
           const normalized = tag.toLowerCase().trim();
           if (normalized && normalized !== seedKeyword.toLowerCase()) {
             tagFrequency[normalized] = (tagFrequency[normalized] || 0) + 1;
+            tagViewAccum[normalized] = (tagViewAccum[normalized] || 0) + (listing.views || 0);
+            tagFavorites[normalized] = (tagFavorites[normalized] || 0) + (listing.num_favorers || 0);
           }
         }
       }
 
-      // Sort by frequency, take top 20
+      // Sort by frequency, take top 25 candidates
       const topKeywords = Object.entries(tagFrequency)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 20);
+        .slice(0, 25);
+
+      const maxFreq = topKeywords[0]?.[1] || 1;
 
       for (const [kw, freq] of topKeywords) {
-        const competitionPct = Math.min(100, Math.round((freq / Math.max(totalResults / 100, 1)) * 100));
-        const volumeTier = estimateVolumeTier(totalResults * (freq / topKeywords[0]?.[1] || 1));
-        const opportunityScore = calculateOpportunityScore(totalResults, competitionPct);
+        // ── Estimated Volume (hybrid formula) ──
+        // Base: total search results for seed × (this tag's frequency ratio)
+        const freqRatio = freq / maxFreq;
+        const rawVolume = totalResults * freqRatio;
+
+        // Engagement multiplier: avg views per listing with this tag
+        const avgViews = (tagViewAccum[kw] || 0) / freq;
+        const engagementMultiplier = Math.min(2.0, 1 + (Math.log10(Math.max(avgViews, 1)) / 5));
+
+        // Autocomplete boost: if keyword appears in title patterns, it's likely higher volume
+        const autocompleteBoost = autocompleteSuggestions.has(kw) ? 1.3 : 1.0;
+
+        const estimatedVolume = Math.round(rawVolume * engagementMultiplier * autocompleteBoost);
+
+        // ── Competition % ── % of top-100 listings using this exact tag
+        const competitionPct = Math.min(100, Math.round((freq / listings.length) * 100));
+
+        // ── Demand Score ── combines volume signal + freshness + engagement
+        const volumeNorm = Math.min(1, Math.log10(Math.max(estimatedVolume, 1)) / 5);
+        const compNorm = competitionPct / 100;
+        const engageNorm = Math.min(1, Math.log10(Math.max(avgViews, 1)) / 4);
+        const demandScore = Math.round(
+          (volumeNorm * 0.45 + engageNorm * 0.25 + (1 - compNorm) * 0.30) * 100
+        );
+
+        // ── CTR Proxy ── top-3 views of listings with this tag / total results
+        const top3Views = listings
+          .filter(l => (l.tags || []).some(t => t.toLowerCase() === kw))
+          .slice(0, 3)
+          .reduce((sum, l) => sum + (l.views || 0), 0) / 3;
+        const ctrProxy = totalResults > 0 ? Math.round((top3Views / totalResults) * 10000) / 100 : 0;
+
+        // ── Trend signal ── based on favorites-to-views ratio (higher = trending up)
+        const avgFavs = (tagFavorites[kw] || 0) / freq;
+        const favViewRatio = avgViews > 0 ? avgFavs / avgViews : 0;
+        const trend = favViewRatio > 0.05 ? 'rising' : favViewRatio > 0.02 ? 'stable' : 'declining';
 
         results.push({
           keyword: kw,
-          estimatedVolume: Math.round(totalResults * (freq / (topKeywords[0]?.[1] || 1))),
-          volumeTier,
+          estimatedVolume,
+          volumeTier: estimateVolumeTier(estimatedVolume),
           competitionPct,
           competitionLevel: competitionPct > 70 ? 'high' : competitionPct > 30 ? 'medium' : 'low',
-          trend: 'stable',
-          opportunityScore,
-          ctrProxy: 0,
+          demandScore,
+          trend,
+          opportunityScore: calculateOpportunityScore(estimatedVolume, competitionPct),
+          ctrProxy,
         });
       }
 
-      results.sort((a, b) => b.opportunityScore - a.opportunityScore);
+      results.sort((a, b) => b.demandScore - a.demandScore);
+      // Keep top 20
+      results.splice(20);
     }
 
     // Cache results

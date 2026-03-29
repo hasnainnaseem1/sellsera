@@ -30,9 +30,14 @@ router.get('/listings', checkShopConnection, etsyController.getListings);
 router.post('/shop/:shopId/disconnect', checkShopConnection, etsyController.disconnectShop);
 
 // @route   POST /api/v1/customer/etsy/shop/:shopId/sync
-// @desc    Manually trigger listing sync for a specific shop
+// @desc    Manually trigger async listing sync for a specific shop
 // @access  Private — requires shop connection + ownership
 router.post('/shop/:shopId/sync', checkShopConnection, etsyController.syncNow);
+
+// @route   GET /api/v1/customer/etsy/sync-status/:jobId
+// @desc    Poll background sync job status
+// @access  Private
+router.get('/sync-status/:jobId', etsyController.getSyncStatus);
 
 // Legacy routes (backward compatible — operate on first active shop)
 router.post('/disconnect', checkShopConnection, etsyController.disconnectShop);

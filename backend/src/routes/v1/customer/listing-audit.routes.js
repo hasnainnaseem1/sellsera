@@ -23,4 +23,13 @@ router.get('/history',
   listingAuditController.getAuditHistory
 );
 
+// @route   POST /api/v1/customer/listing-audit/keyword-insights
+// @desc    Cross-app: fetch keyword insights for a listing's tags (part of audit flow, no extra quota)
+// @access  Private — needs subscription + Etsy shop
+router.post('/keyword-insights',
+  checkSubscription,
+  checkShopConnection,
+  listingAuditController.getKeywordInsights
+);
+
 module.exports = router;

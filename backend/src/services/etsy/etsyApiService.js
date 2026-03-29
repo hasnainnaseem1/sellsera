@@ -21,8 +21,11 @@ const { EtsyShop } = require('../../models/integrations');
 const { getNextKey, handleRateLimit, handleKeyError } = require('./keyPoolService');
 const { encrypt, decrypt } = require('../../utils/encryption');
 const AdminSettings = require('../../models/admin/AdminSettings');
+const rateLimiter = require('./rateLimiter');
 
 const ETSY_API_BASE = 'https://openapi.etsy.com';
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 1000; // exponential backoff base
 
 /**
  * Make a public Etsy API request (no OAuth token, uses API key from pool).
@@ -33,58 +36,84 @@ const ETSY_API_BASE = 'https://openapi.etsy.com';
  * @returns {Object} { success: true, data } or { success: false, error, code }
  */
 const publicRequest = async (method, path, options = {}) => {
-  let key;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let key;
 
-  try {
-    key = await getNextKey();
-  } catch (err) {
-    return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
-  }
-
-  try {
-    const url = buildUrl(path, options.params);
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
-        'Content-Type': 'application/json',
-      },
-      ...(options.body ? { body: JSON.stringify(options.body) } : {}),
-    });
-
-    // Rate limited
-    if (response.status === 429) {
-      const retryAfter = parseInt(response.headers.get('retry-after') || '60', 10);
-      await handleRateLimit(key._id, retryAfter);
-      return { success: false, error: 'Rate limited', code: 'RATE_LIMITED' };
+    try {
+      key = await getNextKey();
+    } catch (err) {
+      return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
     }
 
-    // Server error
-    if (response.status >= 500) {
-      await handleKeyError(key._id, `Etsy ${response.status}: ${response.statusText}`);
-      return { success: false, error: 'Etsy server error', code: 'ETSY_SERVER_ERROR' };
-    }
+    try {
+      // Respect Etsy's 5 QPS / 5K QPD limits
+      await rateLimiter.acquire();
 
-    // Client error
-    if (!response.ok) {
-      const errorBody = await safeParseJson(response);
-      return {
-        success: false,
-        error: errorBody?.error || response.statusText,
-        code: 'ETSY_CLIENT_ERROR',
-        status: response.status,
-      };
-    }
+      const url = buildUrl(path, options.params);
 
-    const data = await response.json();
-    return { success: true, data };
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
+          'Content-Type': 'application/json',
+        },
+        ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+      });
 
-  } catch (err) {
-    if (key) {
-      await handleKeyError(key._id, err.message);
+      // Rate limited — retry with exponential backoff
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('retry-after') || '5', 10);
+        await handleRateLimit(key._id, retryAfter);
+
+        if (attempt < MAX_RETRIES) {
+          const backoffMs = Math.min(retryAfter * 1000, RETRY_BASE_MS * Math.pow(2, attempt));
+          console.warn(`[EtsyAPI] 429 on ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+          await sleep(backoffMs);
+          continue;
+        }
+        return { success: false, error: 'Rate limited after retries', code: 'RATE_LIMITED' };
+      }
+
+      // Server error — retry with backoff
+      if (response.status >= 500) {
+        await handleKeyError(key._id, `Etsy ${response.status}: ${response.statusText}`);
+
+        if (attempt < MAX_RETRIES) {
+          const backoffMs = RETRY_BASE_MS * Math.pow(2, attempt);
+          console.warn(`[EtsyAPI] ${response.status} on ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+          await sleep(backoffMs);
+          continue;
+        }
+        return { success: false, error: 'Etsy server error after retries', code: 'ETSY_SERVER_ERROR' };
+      }
+
+      // Client error (4xx except 429) — don't retry
+      if (!response.ok) {
+        const errorBody = await safeParseJson(response);
+        return {
+          success: false,
+          error: errorBody?.error || response.statusText,
+          code: 'ETSY_CLIENT_ERROR',
+          status: response.status,
+        };
+      }
+
+      const data = await response.json();
+      return { success: true, data };
+
+    } catch (err) {
+      if (key) {
+        await handleKeyError(key._id, err.message);
+      }
+      // Network errors — retry
+      if (attempt < MAX_RETRIES) {
+        const backoffMs = RETRY_BASE_MS * Math.pow(2, attempt);
+        console.warn(`[EtsyAPI] Network error on ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+        await sleep(backoffMs);
+        continue;
+      }
+      return { success: false, error: err.message, code: 'NETWORK_ERROR' };
     }
-    return { success: false, error: err.message, code: 'NETWORK_ERROR' };
   }
 };
 
@@ -107,7 +136,6 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     key = await getNextKey();
     apiKeyHeader = `${key.apiKey}:${key.sharedSecret}`;
   } catch (err) {
-    // Key pool empty — use the OAuth credentials from AdminSettings
     try {
       const settings = await AdminSettings.getSettings();
       const etsy = settings?.etsySettings || {};
@@ -122,86 +150,110 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     }
   }
 
-  const accessToken = decrypt(etsyShop.accessToken_enc);
+  let currentAccessToken = decrypt(etsyShop.accessToken_enc);
 
-  try {
-    const url = buildUrl(path, options.params);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Respect Etsy's 5 QPS / 5K QPD limits
+      await rateLimiter.acquire();
 
-    let response = await fetch(url, {
-      method,
-      headers: {
-        'x-api-key': apiKeyHeader,
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      ...(options.body ? { body: JSON.stringify(options.body) } : {}),
-    });
+      const url = buildUrl(path, options.params);
 
-    // Token expired — attempt one refresh
-    if (response.status === 401) {
-      // Extract clientId from the apiKeyHeader for token refresh
-      const clientId = apiKeyHeader.split(':')[0];
-      const refreshResult = await attemptTokenRefresh(etsyShop, clientId);
-
-      if (!refreshResult.success) {
-        // Refresh failed — token revoked
-        await etsyShop.revokeTokens();
-        console.error(`[EtsyAPI] Token revoked for shop ${etsyShop.shopId} (user ${etsyShop.userId})`);
-        return { success: false, error: 'Etsy connection expired', code: 'SHOP_TOKEN_REVOKED' };
-      }
-
-      // Retry with new access token
-      response = await fetch(url, {
+      let response = await fetch(url, {
         method,
         headers: {
           'x-api-key': apiKeyHeader,
-          'Authorization': `Bearer ${refreshResult.accessToken}`,
+          'Authorization': `Bearer ${currentAccessToken}`,
           'Content-Type': 'application/json',
         },
         ...(options.body ? { body: JSON.stringify(options.body) } : {}),
       });
 
-      // Still 401 after refresh — revoke
-      if (response.status === 401) {
-        await etsyShop.revokeTokens();
-        return { success: false, error: 'Etsy connection expired', code: 'SHOP_TOKEN_REVOKED' };
+      // Token expired — attempt one refresh (only on first attempt)
+      if (response.status === 401 && attempt === 0) {
+        const clientId = apiKeyHeader.split(':')[0];
+        const refreshResult = await attemptTokenRefresh(etsyShop, clientId);
+
+        if (!refreshResult.success) {
+          await etsyShop.revokeTokens();
+          console.error(`[EtsyAPI] Token revoked for shop ${etsyShop.shopId} (user ${etsyShop.userId})`);
+          return { success: false, error: 'Etsy connection expired', code: 'SHOP_TOKEN_REVOKED' };
+        }
+
+        currentAccessToken = refreshResult.accessToken;
+        await rateLimiter.acquire();
+
+        response = await fetch(url, {
+          method,
+          headers: {
+            'x-api-key': apiKeyHeader,
+            'Authorization': `Bearer ${currentAccessToken}`,
+            'Content-Type': 'application/json',
+          },
+          ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+        });
+
+        if (response.status === 401) {
+          await etsyShop.revokeTokens();
+          return { success: false, error: 'Etsy connection expired', code: 'SHOP_TOKEN_REVOKED' };
+        }
       }
-    }
 
-    // Rate limited
-    if (response.status === 429) {
-      const retryAfter = parseInt(response.headers.get('retry-after') || '60', 10);
-      if (key) await handleRateLimit(key._id, retryAfter);
-      return { success: false, error: 'Rate limited', code: 'RATE_LIMITED' };
-    }
+      // Rate limited — retry with exponential backoff
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('retry-after') || '5', 10);
+        if (key) await handleRateLimit(key._id, retryAfter);
 
-    // Server error
-    if (response.status >= 500) {
-      if (key) await handleKeyError(key._id, `Etsy ${response.status}: ${response.statusText}`);
-      return { success: false, error: 'Etsy server error', code: 'ETSY_SERVER_ERROR' };
-    }
+        if (attempt < MAX_RETRIES) {
+          const backoffMs = Math.min(retryAfter * 1000, RETRY_BASE_MS * Math.pow(2, attempt));
+          console.warn(`[EtsyAPI] 429 on ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+          await sleep(backoffMs);
+          continue;
+        }
+        return { success: false, error: 'Rate limited after retries', code: 'RATE_LIMITED' };
+      }
 
-    // Other client errors
-    if (!response.ok) {
-      const errorBody = await safeParseJson(response);
-      console.error(`[EtsyAPI] ${method} ${path} failed:`, response.status, errorBody?.error || response.statusText);
-      return {
-        success: false,
-        error: errorBody?.error || response.statusText,
-        code: 'ETSY_CLIENT_ERROR',
-        status: response.status,
-      };
-    }
+      // Server error — retry with backoff
+      if (response.status >= 500) {
+        if (key) await handleKeyError(key._id, `Etsy ${response.status}: ${response.statusText}`);
 
-    const data = await response.json();
-    return { success: true, data };
+        if (attempt < MAX_RETRIES) {
+          const backoffMs = RETRY_BASE_MS * Math.pow(2, attempt);
+          console.warn(`[EtsyAPI] ${response.status} on ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+          await sleep(backoffMs);
+          continue;
+        }
+        return { success: false, error: 'Etsy server error after retries', code: 'ETSY_SERVER_ERROR' };
+      }
 
-  } catch (err) {
-    if (key) {
-      await handleKeyError(key._id, err.message);
+      // Other client errors — don't retry
+      if (!response.ok) {
+        const errorBody = await safeParseJson(response);
+        console.error(`[EtsyAPI] ${method} ${path} failed:`, response.status, errorBody?.error || response.statusText);
+        return {
+          success: false,
+          error: errorBody?.error || response.statusText,
+          code: 'ETSY_CLIENT_ERROR',
+          status: response.status,
+        };
+      }
+
+      const data = await response.json();
+      return { success: true, data };
+
+    } catch (err) {
+      if (key) {
+        await handleKeyError(key._id, err.message);
+      }
+      if (attempt < MAX_RETRIES) {
+        const backoffMs = RETRY_BASE_MS * Math.pow(2, attempt);
+        console.warn(`[EtsyAPI] Network error on ${path} — retry ${attempt + 1}/${MAX_RETRIES} in ${backoffMs}ms`);
+        await sleep(backoffMs);
+        continue;
+      }
+      console.error(`[EtsyAPI] ${method} ${path} network error:`, err.message);
+      return { success: false, error: err.message, code: 'NETWORK_ERROR' };
     }
-    console.error(`[EtsyAPI] ${method} ${path} network error:`, err.message);
-    return { success: false, error: err.message, code: 'NETWORK_ERROR' };
   }
 };
 
@@ -277,3 +329,5 @@ const safeParseJson = async (response) => {
 };
 
 module.exports = { publicRequest, authenticatedRequest };
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));

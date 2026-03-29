@@ -13,6 +13,7 @@
  */
 
 const { SerpCostLog } = require('../../models/customer');
+const { KeywordSearch } = require('../../models/customer');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
@@ -124,6 +125,9 @@ const analyzeTags = async (req, res) => {
           needsWork,
           missingTags: Math.max(0, 13 - tagList.length),
         },
+        suggestedReplacements: needsWork > 0
+          ? await getReplacementSuggestions(req.userId, tagList, title)
+          : [],
       },
     });
   } catch (error) {
@@ -202,6 +206,59 @@ function generateSuggestion(tag, title) {
 
 function hashKey(str) {
   return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
+}
+
+/**
+ * Cross-reference user's existing keyword research to find high-traffic keywords
+ * that could replace low-performing tags.
+ */
+async function getReplacementSuggestions(userId, currentTags, title) {
+  try {
+    // Get user's most recent keyword research results
+    const recentSearches = await KeywordSearch.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('results');
+
+    if (recentSearches.length === 0) return [];
+
+    // Collect all researched keywords with their scores
+    const keywordPool = new Map();
+    const currentTagSet = new Set(currentTags.map(t => t.toLowerCase()));
+    const titleLower = title.toLowerCase();
+
+    for (const search of recentSearches) {
+      for (const kw of (search.results || [])) {
+        const kwLower = kw.keyword.toLowerCase();
+        // Skip keywords already in tags
+        if (currentTagSet.has(kwLower)) continue;
+        // Prefer keywords relevant to the listing title
+        const titleWords = titleLower.split(/\s+/).filter(w => w.length > 2);
+        const kwWords = kwLower.split(/\s+/);
+        const overlap = kwWords.some(w => titleWords.includes(w));
+
+        const relevanceBoost = overlap ? 1.5 : 1.0;
+        const score = (kw.demandScore || kw.opportunityScore || 50) * relevanceBoost;
+
+        if (!keywordPool.has(kwLower) || keywordPool.get(kwLower).score < score) {
+          keywordPool.set(kwLower, {
+            keyword: kw.keyword,
+            score: Math.round(score),
+            estimatedVolume: kw.estimatedVolume || 0,
+            competitionLevel: kw.competitionLevel || 'unknown',
+            source: 'keyword_research',
+          });
+        }
+      }
+    }
+
+    // Sort by score, return top 5 suggestions
+    return [...keywordPool.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  } catch {
+    return [];
+  }
 }
 
 module.exports = { analyzeTags };

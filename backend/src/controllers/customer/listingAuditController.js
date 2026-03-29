@@ -11,7 +11,11 @@
  */
 
 const { ListingAudit } = require('../../models/customer');
+const { KeywordSearch } = require('../../models/customer');
 const { EtsyListing } = require('../../models/integrations');
+const etsyApi = require('../../services/etsy/etsyApiService');
+const redis = require('../../services/cache/redisService');
+const crypto = require('crypto');
 
 /**
  * POST /api/v1/customer/listing-audit
@@ -394,4 +398,142 @@ function generateRecommendations(title, tags, desc, image, price, category, shop
   return recs;
 }
 
-module.exports = { auditListing, getAuditHistory };
+/**
+ * POST /api/v1/customer/listing-audit/keyword-insights
+ * Cross-app integration: fetch keyword insights for a listing's tags and title.
+ * Pulls data from existing keyword research history + live Etsy search data.
+ * Does NOT count as a keyword_search usage — it's part of the audit flow.
+ */
+const getKeywordInsights = async (req, res) => {
+  try {
+    const { title, tags, category } = req.body;
+
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Listing title is required',
+      });
+    }
+
+    const listingTags = (tags || []).map(t => (typeof t === 'string' ? t.trim() : '')).filter(Boolean);
+
+    // 1. Check user's existing keyword research for relevant data
+    const existingResearch = await KeywordSearch.find({ userId: req.userId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('seedKeyword results createdAt');
+
+    const researchKeywords = new Map();
+    for (const search of existingResearch) {
+      for (const kw of (search.results || [])) {
+        const kwLower = kw.keyword.toLowerCase();
+        if (!researchKeywords.has(kwLower)) {
+          researchKeywords.set(kwLower, {
+            keyword: kw.keyword,
+            estimatedVolume: kw.estimatedVolume || 0,
+            competitionLevel: kw.competitionLevel || 'unknown',
+            demandScore: kw.demandScore || kw.opportunityScore || 0,
+            source: 'research_history',
+          });
+        }
+      }
+    }
+
+    // 2. Cross-reference current tags with research data
+    const tagInsights = [];
+    const missingInsights = [];
+
+    for (const tag of listingTags) {
+      const tagLower = tag.toLowerCase();
+      const fromResearch = researchKeywords.get(tagLower);
+
+      if (fromResearch) {
+        tagInsights.push({
+          tag,
+          hasResearchData: true,
+          ...fromResearch,
+        });
+      } else {
+        // Quick check: get competition data from cache or a lightweight API call
+        const cacheKey = `kw:insight:${hashKeyInsight(tagLower)}`;
+        let cached = await redis.get(cacheKey);
+
+        if (!cached) {
+          const searchResult = await etsyApi.publicRequest(
+            'GET',
+            '/v3/application/listings/active',
+            { params: { keywords: tag, limit: 5 } }
+          );
+
+          if (searchResult.success) {
+            const totalResults = searchResult.data.count || 0;
+            cached = {
+              estimatedVolume: totalResults,
+              competitionLevel: totalResults > 100000 ? 'high' : totalResults > 10000 ? 'medium' : 'low',
+            };
+            await redis.set(cacheKey, cached, 21600);
+          }
+        }
+
+        tagInsights.push({
+          tag,
+          hasResearchData: false,
+          estimatedVolume: cached?.estimatedVolume || 0,
+          competitionLevel: cached?.competitionLevel || 'unknown',
+          demandScore: null,
+          source: 'live_lookup',
+        });
+      }
+    }
+
+    // 3. Find high-value keywords from research that are NOT in current tags
+    const currentTagSet = new Set(listingTags.map(t => t.toLowerCase()));
+    const titleWords = title.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+    for (const [kwLower, kwData] of researchKeywords) {
+      if (currentTagSet.has(kwLower)) continue;
+
+      // Only suggest keywords relevant to this listing
+      const kwWords = kwLower.split(/\s+/);
+      const isRelevant = kwWords.some(w => titleWords.includes(w));
+      if (!isRelevant && (kwData.demandScore || 0) < 60) continue;
+
+      missingInsights.push({
+        keyword: kwData.keyword,
+        estimatedVolume: kwData.estimatedVolume,
+        competitionLevel: kwData.competitionLevel,
+        demandScore: kwData.demandScore,
+        reason: isRelevant ? 'Relevant to your title — high potential tag' : 'High-demand keyword from your research',
+      });
+    }
+
+    missingInsights.sort((a, b) => (b.demandScore || 0) - (a.demandScore || 0));
+
+    return res.json({
+      success: true,
+      data: {
+        tagInsights,
+        suggestedKeywords: missingInsights.slice(0, 10),
+        researchCoverage: {
+          tagsWithData: tagInsights.filter(t => t.hasResearchData).length,
+          totalTags: tagInsights.length,
+          recommendation: tagInsights.filter(t => t.hasResearchData).length < listingTags.length / 2
+            ? 'Run a keyword search for your listing\'s niche to unlock better insights'
+            : null,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Keyword insights error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch keyword insights',
+    });
+  }
+};
+
+function hashKeyInsight(str) {
+  return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
+}
+
+module.exports = { auditListing, getAuditHistory, getKeywordInsights };

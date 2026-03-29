@@ -249,7 +249,8 @@ const getListings = async (req, res) => {
 
 /**
  * POST /api/v1/customer/etsy/sync
- * Manually trigger a listing sync for the user's connected shop.
+ * Trigger an async background sync for the user's connected shop.
+ * Returns 202 Accepted with a jobId for status polling.
  */
 const syncNow = async (req, res) => {
   try {
@@ -258,25 +259,73 @@ const syncNow = async (req, res) => {
       return res.status(404).json({ success: false, message: 'No Etsy shop connected' });
     }
 
-    const result = await shopSyncService.syncListings(shop);
-
-    if (result.success) {
-      return res.json({
+    // Check if already syncing
+    const syncJobManager = require('../../services/etsy/syncJobManager');
+    if (syncJobManager.isShopSyncing(shop._id)) {
+      const existing = syncJobManager.getLatestJobForShop(shop._id);
+      return res.status(202).json({
         success: true,
-        message: `Synced ${result.syncedCount} listings`,
-        data: { syncedCount: result.syncedCount },
-      });
-    } else {
-      return res.status(500).json({
-        success: false,
-        message: result.error || 'Sync failed',
+        message: 'Sync already in progress',
+        data: { jobId: existing?.id, status: 'running', progress: existing?.progress },
       });
     }
+
+    // Start async sync — returns immediately
+    const jobId = shopSyncService.asyncFullSync(shop);
+
+    return res.status(202).json({
+      success: true,
+      message: 'Sync started in background',
+      data: { jobId, status: 'running' },
+    });
   } catch (error) {
     console.error('Manual sync error:', error.message);
     return res.status(500).json({
       success: false,
-      message: 'Failed to sync listings',
+      message: 'Failed to start sync',
+    });
+  }
+};
+
+/**
+ * GET /api/v1/customer/etsy/sync-status/:jobId
+ * Poll the status of a background sync job.
+ */
+const getSyncStatus = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    if (!jobId) {
+      return res.status(400).json({ success: false, message: 'Job ID is required' });
+    }
+
+    const syncJobManager = require('../../services/etsy/syncJobManager');
+    const job = await syncJobManager.getJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Sync job not found' });
+    }
+
+    // Ensure user can only see their own jobs
+    if (job.userId !== String(req.userId)) {
+      return res.status(404).json({ success: false, message: 'Sync job not found' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        jobId: job.id,
+        status: job.status,
+        progress: job.progress,
+        startedAt: job.startedAt,
+        completedAt: job.completedAt,
+        error: job.error,
+      },
+    });
+  } catch (error) {
+    console.error('Sync status error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get sync status',
     });
   }
 };
@@ -288,4 +337,5 @@ module.exports = {
   getListings,
   disconnectShop,
   syncNow,
+  getSyncStatus,
 };

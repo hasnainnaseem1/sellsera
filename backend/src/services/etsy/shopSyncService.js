@@ -18,15 +18,17 @@ const { EtsyListing } = require('../../models/integrations');
 const { ShopReceipt } = require('../../models/customer');
 const { EtsyShop } = require('../../models/integrations');
 const etsyApi = require('./etsyApiService');
+const syncJobManager = require('./syncJobManager');
 
 /**
  * Sync active listings for a shop.
  * Fetches all listings and upserts into EtsyListing collection.
  * 
  * @param {Object} etsyShop - EtsyShop Mongoose document
+ * @param {string} [jobId] - Optional sync job ID for progress tracking
  * @returns {{ success: boolean, syncedCount: number, error?: string }}
  */
-const syncListings = async (etsyShop) => {
+const syncListings = async (etsyShop, jobId = null) => {
   try {
     // Mark shop as syncing
     etsyShop.status = 'syncing';
@@ -58,6 +60,13 @@ const syncListings = async (etsyShop) => {
 
       console.log(`[ShopSync] Got ${result.data?.results?.length || 0} listings (count: ${result.data?.count})`);
 
+      // Report total estimate on first page
+      if (offset === 0 && jobId) {
+        syncJobManager.updateProgress(jobId, {
+          totalEstimate: result.data?.count || 0,
+          phase: 'listings',
+        });
+      }
 
       const listings = result.data.results || [];
 
@@ -89,6 +98,11 @@ const syncListings = async (etsyShop) => {
           { upsert: true, new: true }
         );
         totalSynced++;
+      }
+
+      // Report progress after each page
+      if (jobId) {
+        syncJobManager.updateProgress(jobId, { syncedCount: totalSynced });
       }
 
       hasMore = listings.length === limit;
@@ -202,12 +216,50 @@ const syncReceipts = async (etsyShop) => {
  * Full sync — listings + receipts.
  * 
  * @param {Object} etsyShop - EtsyShop Mongoose document
+ * @param {string} [jobId] - Optional sync job ID for progress tracking
  * @returns {{ listings: Object, receipts: Object }}
  */
-const fullSync = async (etsyShop) => {
-  const listings = await syncListings(etsyShop);
+const fullSync = async (etsyShop, jobId = null) => {
+  const listings = await syncListings(etsyShop, jobId);
+
+  if (jobId) {
+    syncJobManager.updateProgress(jobId, { phase: 'receipts' });
+  }
+
   const receipts = await syncReceipts(etsyShop);
   return { listings, receipts };
+};
+
+/**
+ * Async full sync — runs in the background, tracks progress via syncJobManager.
+ * Returns the jobId immediately so the caller can poll for status.
+ * 
+ * @param {Object} etsyShop - EtsyShop Mongoose document
+ * @returns {string} jobId
+ */
+const asyncFullSync = (etsyShop) => {
+  // Prevent duplicate sync jobs for the same shop
+  if (syncJobManager.isShopSyncing(etsyShop._id)) {
+    const existing = syncJobManager.getLatestJobForShop(etsyShop._id);
+    if (existing) return existing.id;
+  }
+
+  const jobId = syncJobManager.startJob(etsyShop._id, etsyShop.userId);
+
+  // Fire-and-forget — runs in the background
+  (async () => {
+    try {
+      const result = await fullSync(etsyShop, jobId);
+      const syncedCount = result.listings.syncedCount || 0;
+      syncJobManager.completeJob(jobId, { syncedCount });
+      console.log(`[ShopSync] Async sync completed for shop ${etsyShop.shopId}: ${syncedCount} listings`);
+    } catch (err) {
+      syncJobManager.failJob(jobId, err.message);
+      console.error(`[ShopSync] Async sync failed for shop ${etsyShop.shopId}:`, err.message);
+    }
+  })();
+
+  return jobId;
 };
 
 /**
@@ -242,4 +294,4 @@ const mapReceiptStatus = (receipt, shipment) => {
   return 'paid';
 };
 
-module.exports = { syncListings, syncReceipts, fullSync, syncAllShops };
+module.exports = { syncListings, syncReceipts, fullSync, asyncFullSync, syncAllShops };
