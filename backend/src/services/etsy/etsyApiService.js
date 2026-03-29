@@ -54,7 +54,7 @@ const publicRequest = async (method, path, options = {}) => {
       const response = await fetch(url, {
         method,
         headers: {
-          'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
+          'x-api-key': key.apiKey,
           'Content-Type': 'application/json',
         },
         ...(options.body ? { body: JSON.stringify(options.body) } : {}),
@@ -90,6 +90,7 @@ const publicRequest = async (method, path, options = {}) => {
       // Client error (4xx except 429) — don't retry
       if (!response.ok) {
         const errorBody = await safeParseJson(response);
+        console.error(`[EtsyAPI] ${method} ${path} → ${response.status}:`, errorBody?.error || response.statusText);
         return {
           success: false,
           error: errorBody?.error || response.statusText,
@@ -134,17 +135,16 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
   // Try key pool first, fall back to OAuth config from AdminSettings
   try {
     key = await getNextKey();
-    apiKeyHeader = `${key.apiKey}:${key.sharedSecret}`;
+    apiKeyHeader = key.apiKey;
   } catch (err) {
     try {
       const settings = await AdminSettings.getSettings();
       const etsy = settings?.etsySettings || {};
       const clientId = etsy.clientId || process.env.ETSY_CLIENT_ID;
-      const clientSecret = etsy.clientSecret || process.env.ETSY_CLIENT_SECRET;
       if (!clientId) {
         return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
       }
-      apiKeyHeader = `${clientId}:${clientSecret}`;
+      apiKeyHeader = clientId;
     } catch {
       return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
     }
