@@ -17,6 +17,14 @@ const log = require('../../utils/logger')('KeywordCtrl');
 
 const SERP_COST_PER_REQ = 0.0025;
 
+// Plan-based result limits for keyword search
+const PLAN_RESULT_LIMITS = {
+  'Free': 5,
+  'Starter': 25,
+  'Pro': 75,
+  'Elite': Infinity,
+};
+
 /**
  * POST /api/v1/customer/keywords/search
  * Basic keyword search — returns related keywords with volume estimates.
@@ -49,9 +57,21 @@ const searchKeywords = async (req, res) => {
         serpCallCount: 0,
       });
 
+      // Plan-based slicing on cached results too
+      const planName = req.user?.planSnapshot?.planName || 'Free';
+      const maxResults = PLAN_RESULT_LIMITS[planName] ?? 5;
+      const slicedCached = Number.isFinite(maxResults) ? cached.slice(0, maxResults) : cached;
+
       return res.json({
         success: true,
-        data: { keyword: seedKeyword, results: cached, cached: true },
+        data: {
+          keyword: seedKeyword,
+          results: slicedCached,
+          cached: true,
+          totalKeywords: cached.length,
+          returnedKeywords: slicedCached.length,
+          plan: planName,
+        },
       });
     }
 
@@ -73,10 +93,10 @@ const searchKeywords = async (req, res) => {
 
     log.info(`searchKeywords: SUCCESS for "${seedKeyword}" - ${results.length} results, ${searchData.serpCalls} SERP calls`);
 
-    // Cache results (even if empty — means the keyword genuinely has no data)
+    // Cache full results (even if empty — means the keyword genuinely has no data)
     await redis.set(cacheKey, results, 21600);
 
-    // Save to DB
+    // Save full results to DB
     await KeywordSearch.create({
       userId: req.userId,
       seedKeyword,
@@ -98,13 +118,21 @@ const searchKeywords = async (req, res) => {
       });
     }
 
+    // Plan-based result slicing — return only what the plan allows
+    const planName = req.user?.planSnapshot?.planName || 'Free';
+    const maxResults = PLAN_RESULT_LIMITS[planName] ?? 5;
+    const slicedResults = Number.isFinite(maxResults) ? results.slice(0, maxResults) : results;
+
     return res.json({
       success: true,
       data: {
         keyword: seedKeyword,
-        results,
+        results: slicedResults,
         cached: false,
         totalResults: searchData.totalResults,
+        totalKeywords: results.length,
+        returnedKeywords: slicedResults.length,
+        plan: planName,
       },
     });
   } catch (error) {

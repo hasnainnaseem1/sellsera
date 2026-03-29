@@ -21,6 +21,7 @@ const etsyApi = require('./etsyApiService');
 const redis = require('../cache/redisService');
 const crypto = require('crypto');
 const log = require('../../utils/logger')('KeywordService');
+const { CODE_TO_LOCATION } = require('../../utils/constants/etsyCountries');
 
 /**
  * Search Etsy for a keyword and return enriched results.
@@ -35,7 +36,7 @@ const fetchListings = async (keyword, limit = 100, options = {}) => {
 
   const params = { keywords: keyword, limit, sort_on: 'score' };
   if (offset) params.offset = offset;
-  if (country) params.shop_location = country;
+  if (country) params.shop_location = CODE_TO_LOCATION[country] || country;
 
   const result = await etsyApi.publicRequest(
     'GET',
@@ -68,7 +69,7 @@ const fetchListings = async (keyword, limit = 100, options = {}) => {
  * Extract related keywords from listing tags with volume estimation.
  * This is the core "eRank-style" algorithm.
  * 
- * Fetches 3 pages of 100 listings (up to 300) for richer keyword extraction.
+ * Fetches up to 5 pages of 100 listings (up to 500) for richer keyword extraction.
  * 
  * @param {string} seedKeyword
  * @param {Object} [options] - { country }
@@ -108,18 +109,19 @@ const getRelatedKeywords = async (seedKeyword, options = {}) => {
   const totalResults = primary.totalResults;
   let serpCalls = 1;
 
-  // Fetch pages 2 and 3 concurrently for more keyword diversity
+  // Fetch pages 2-5 concurrently for more keyword diversity
   if (totalResults > 100) {
-    const extraPages = await Promise.allSettled([
-      fetchListings(seedKeyword, 100, { country, offset: 100 }),
-      totalResults > 200 ? fetchListings(seedKeyword, 100, { country, offset: 200 }) : Promise.resolve(null),
-    ]);
+    const pagesToFetch = [];
+    for (let page = 1; page < 5 && totalResults > page * 100; page++) {
+      pagesToFetch.push(fetchListings(seedKeyword, 100, { country, offset: page * 100 }));
+    }
+    const extraPages = await Promise.allSettled(pagesToFetch);
 
     for (const page of extraPages) {
       if (page.status === 'fulfilled' && page.value?.success && page.value.listings?.length > 0) {
         listings = listings.concat(page.value.listings);
         serpCalls++;
-      } else if (page.status === 'fulfilled' && page.value !== null) {
+      } else if (page.status === 'fulfilled') {
         serpCalls++;
       }
     }
@@ -154,10 +156,10 @@ const getRelatedKeywords = async (seedKeyword, options = {}) => {
     }
   }
 
-  // Sort by frequency, take top 50 candidates
+  // Sort by frequency, take top 150 candidates
   const topKeywords = Object.entries(tagFrequency)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 50);
+    .slice(0, 150);
 
   const maxFreq = topKeywords[0]?.[1] || 1;
   const results = [];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card, Input, Select, Button, Table, Tag, Typography, Row, Col,
   Space, Empty, message, theme,
@@ -17,7 +17,8 @@ import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 
-const COUNTRIES = [
+// Fallback if API fails
+const FALLBACK_COUNTRIES = [
   { value: 'US', label: '🇺🇸 United States' },
   { value: 'GB', label: '🇬🇧 United Kingdom' },
   { value: 'CA', label: '🇨🇦 Canada' },
@@ -40,9 +41,18 @@ const KeywordResearchPage = () => {
 
   const [keyword, setKeyword] = useState('');
   const [country, setCountry] = useState('US');
+  const [countries, setCountries] = useState(FALLBACK_COUNTRIES);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    etsyApi.getCountries()
+      .then(res => {
+        if (res.success && res.data?.length) setCountries(res.data);
+      })
+      .catch(() => {});
+  }, []);
 
   const card = {
     borderRadius: radii.lg,
@@ -143,8 +153,8 @@ const KeywordResearchPage = () => {
       width: 80,
       align: 'center',
       render: (t) => (
-        <Tag color={t === 'up' ? 'green' : t === 'down' ? 'red' : 'default'} style={{ fontSize: 11 }}>
-          {t === 'up' ? '↑ Up' : t === 'down' ? '↓ Down' : '→ Stable'}
+        <Tag color={t === 'rising' ? 'green' : t === 'declining' ? 'red' : 'default'} style={{ fontSize: 11 }}>
+          {t === 'rising' ? '↑ Rising' : t === 'declining' ? '↓ Declining' : '→ Stable'}
         </Tag>
       ),
     },
@@ -185,10 +195,12 @@ const KeywordResearchPage = () => {
               <Select
                 value={country}
                 onChange={setCountry}
-                options={COUNTRIES}
+                options={countries}
                 size="large"
                 style={{ width: '100%' }}
                 prefix={<GlobalOutlined />}
+                showSearch
+                optionFilterProp="label"
               />
             </Col>
             <Col xs={12} md={6}>

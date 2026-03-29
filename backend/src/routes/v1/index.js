@@ -6,6 +6,7 @@ const customerRoutes = require('./customer');
 const adminRoutes = require('./admin');
 const notificationRoutes = require('./notification');
 const publicRoutes = require('./public');
+const metaRoutes = require('./meta');
 const stripeWebhookRoutes = require('./webhooks/stripe.routes');
 const lemonSqueezyWebhookRoutes = require('./webhooks/lemonsqueezy.routes');
 
@@ -14,6 +15,7 @@ router.use('/customer', customerRoutes);
 router.use('/admin', adminRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/public', publicRoutes);
+router.use('/meta', metaRoutes);
 router.use('/webhooks/stripe', stripeWebhookRoutes);
 router.use('/webhooks/lemonsqueezy', lemonSqueezyWebhookRoutes);
 
