@@ -192,7 +192,7 @@ function analyzeKeyword(kw, ctx) {
   // Trend signal — favorites-to-views ratio
   const avgFavs = (tagFavorites[kw] || 0) / freq;
   const favViewRatio = avgViews > 0 ? avgFavs / avgViews : 0;
-  const trend = favViewRatio > 0.05 ? 'up' : favViewRatio > 0.02 ? 'stable' : 'down';
+  const trend = favViewRatio > 0.05 ? 'rising' : favViewRatio > 0.02 ? 'stable' : 'declining';
 
   return {
     keyword: kw,
@@ -283,7 +283,7 @@ const deepAnalyzeKeyword = async (seedKeyword) => {
   const avgViews = listings.reduce((s, l) => s + (l.views || 0), 0) / listings.length;
   const avgFavs = listings.reduce((s, l) => s + (l.num_favorers || 0), 0) / listings.length;
   const favViewRatio = avgViews > 0 ? avgFavs / avgViews : 0;
-  const trend = favViewRatio > 0.05 ? 'up' : favViewRatio > 0.02 ? 'stable' : 'down';
+  const trend = favViewRatio > 0.05 ? 'rising' : favViewRatio > 0.02 ? 'stable' : 'declining';
   const trendPct = Math.round(favViewRatio * 100);
 
   // Extract related keywords from tags
