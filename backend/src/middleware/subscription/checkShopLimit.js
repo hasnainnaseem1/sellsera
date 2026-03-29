@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('ShopLimit');
 /**
  * checkShopLimit Middleware
  * 
@@ -74,7 +75,7 @@ const checkShopLimit = async (req, res, next) => {
 
     return next();
   } catch (error) {
-    console.error('checkShopLimit error:', error.message);
+    log.error('checkShopLimit error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error checking shop limit',

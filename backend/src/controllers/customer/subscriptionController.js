@@ -5,6 +5,7 @@
  */
 const { getRemainingUsage } = require('../../services/subscription/usageService');
 const { Plan } = require('../../models/subscription');
+const log = require('../../utils/logger')('SubCtrl');
 
 /**
  * Get current customer's subscription & plan info
@@ -53,7 +54,7 @@ const getSubscription = async (req, res) => {
       features: planFeatures,
     });
   } catch (error) {
-    console.error('Get subscription error:', error);
+    log.error('Get subscription error:', error);
     res.status(500).json({ success: false, message: 'Error fetching subscription info' });
   }
 };
@@ -73,7 +74,7 @@ const getUsage = async (req, res) => {
       usage,
     });
   } catch (error) {
-    console.error('Get usage error:', error);
+    log.error('Get usage error:', error);
     res.status(500).json({ success: false, message: 'Error fetching usage info' });
   }
 };

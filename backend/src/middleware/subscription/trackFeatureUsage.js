@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('FeatureUsage');
 /**
  * trackFeatureUsage Middleware Factory
  * 
@@ -47,7 +48,7 @@ const trackFeatureUsage = (featureKey) => {
             method: req.method,
           },
         }).catch((err) => {
-          console.error(`Failed to log feature usage (${featureKey}):`, err);
+          log.error(`Failed to log feature usage (${featureKey}):`, err.message);
         });
       }
 

@@ -6,9 +6,10 @@
  */
 const { CompetitorWatch, CompetitorSnapshot } = require('../models/customer');
 const etsyApi = require('../services/etsy/etsyApiService');
+const log = require('../utils/logger')('CronCompetitor');
 
 const run = async () => {
-  console.log('[CRON] Starting daily competitor sync...');
+  log.info('Starting daily competitor sync...');
 
   const watches = await CompetitorWatch.find({ status: 'active' }).lean();
   let refreshed = 0;
@@ -63,12 +64,12 @@ const run = async () => {
 
       refreshed++;
     } catch (err) {
-      console.error(`[CRON] Competitor sync error for ${watch.shopName}:`, err.message);
+      log.error(`Competitor sync error for ${watch.shopName}:`, err.message);
       failed++;
     }
   }
 
-  console.log(`[CRON] Competitor sync complete — ${refreshed} refreshed, ${failed} failed out of ${watches.length}`);
+  log.info(`Competitor sync complete — ${refreshed} refreshed, ${failed} failed out of ${watches.length}`);
 };
 
 module.exports = { run };

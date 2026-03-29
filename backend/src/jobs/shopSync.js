@@ -5,11 +5,12 @@
  * Called by the cron registry (jobs/index.js).
  */
 const { shopSyncService } = require('../services/etsy');
+const log = require('../utils/logger')('CronShopSync');
 
 const run = async () => {
-  console.log('[CRON] Starting daily shop sync for all active shops...');
+  log.info('Starting daily shop sync for all active shops...');
   const results = await shopSyncService.syncAllShops();
-  console.log(`[CRON] Shop sync complete — ${results.synced} synced, ${results.failed} failed, ${results.skipped} skipped`);
+  log.info(`Shop sync complete — ${results.synced} synced, ${results.failed} failed, ${results.skipped} skipped`);
 };
 
 module.exports = { run };

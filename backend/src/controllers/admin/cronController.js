@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('AdminCron');
 const cronLib = require('node-cron');
 const {
   getJobStatuses,
@@ -18,7 +19,7 @@ const listJobs = async (req, res) => {
     const jobs = getJobStatuses();
     res.json({ success: true, jobs });
   } catch (error) {
-    console.error('Get cron jobs error:', error);
+    log.error('Get cron jobs error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to get cron job statuses' });
   }
 };
@@ -63,7 +64,7 @@ const createJob = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'A job with this key already exists' });
     }
-    console.error('Create cron job error:', error);
+    log.error('Create cron job error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to create cron job' });
   }
 };
@@ -102,7 +103,7 @@ const updateJob = async (req, res) => {
     updateCustomJob(doc);
     res.json({ success: true, message: 'Custom cron job updated', job: doc });
   } catch (error) {
-    console.error('Update cron job error:', error);
+    log.error('Update cron job error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to update cron job' });
   }
 };
@@ -126,7 +127,7 @@ const deleteJob = async (req, res) => {
 
     res.json({ success: true, message: 'Custom cron job deleted' });
   } catch (error) {
-    console.error('Delete cron job error:', error);
+    log.error('Delete cron job error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to delete cron job' });
   }
 };
@@ -146,7 +147,7 @@ const toggleJobHandler = async (req, res) => {
     }
     res.json({ success: true, message: `Job ${result.enabled ? 'enabled' : 'disabled'}`, ...result });
   } catch (error) {
-    console.error('Toggle cron job error:', error);
+    log.error('Toggle cron job error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to toggle cron job' });
   }
 };
@@ -166,7 +167,7 @@ const triggerJobHandler = async (req, res) => {
     const result = await triggerJob(req.params.key);
     res.json({ success: true, message: 'Job executed successfully', ...result });
   } catch (error) {
-    console.error('Trigger cron job error:', error);
+    log.error('Trigger cron job error:', error.message);
     res.status(500).json({ success: false, message: error.message || 'Failed to trigger cron job' });
   }
 };

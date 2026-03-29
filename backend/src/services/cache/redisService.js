@@ -22,6 +22,7 @@
  */
 
 const Redis = require('ioredis');
+const log = require('../../utils/logger')('Redis');
 
 let client = null;
 let isConnected = false;
@@ -45,12 +46,12 @@ const getClient = () => {
 
   client.on('connect', () => {
     isConnected = true;
-    console.log('[Redis] Connected');
+    log.info('Connected');
   });
 
   client.on('error', (err) => {
     isConnected = false;
-    console.error('[Redis] Error:', err.message);
+    log.error('Error:', err.message);
   });
 
   client.on('close', () => {
@@ -59,7 +60,7 @@ const getClient = () => {
 
   // Attempt connection (non-blocking)
   client.connect().catch(() => {
-    console.warn('[Redis] Could not connect — caching disabled, falling back to direct queries');
+    log.warn('Could not connect — caching disabled, falling back to direct queries');
   });
 
   return client;

@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('SEO');
 const { AdminSettings, MarketingPage, BlogPost, SeoRedirect } = require('../../models/admin');
 const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 const { safeSave } = require('../../utils/helpers/safeDbOps');
@@ -73,7 +74,7 @@ const getSitemap = async (req, res) => {
     res.set('Content-Type', 'application/xml');
     res.send(xml);
   } catch (err) {
-    console.error('Sitemap error:', err);
+    log.error('Sitemap error:', err.message);
     res.status(500).send('Failed to generate sitemap');
   }
 };
@@ -122,7 +123,7 @@ const getRobotsTxt = async (req, res) => {
     res.set('Content-Type', 'text/plain');
     res.send(content);
   } catch (err) {
-    console.error('Robots.txt error:', err);
+    log.error('Robots.txt error:', err.message);
     res.status(500).send('Failed to generate robots.txt');
   }
 };
@@ -157,7 +158,7 @@ const getSettings = async (req, res) => {
       },
     }, req));
   } catch (err) {
-    console.error('SEO settings error:', err);
+    log.error('SEO settings error:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch SEO settings' });
   }
 };
@@ -189,7 +190,7 @@ const checkRedirect = async (req, res) => {
 
     res.json({ success: true, redirect: null });
   } catch (err) {
-    console.error('Redirect check error:', err);
+    log.error('Redirect check error:', err.message);
     res.json({ success: true, redirect: null });
   }
 };

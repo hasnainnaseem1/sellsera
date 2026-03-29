@@ -14,6 +14,7 @@ const { EtsyShop, EtsyListing, EtsyOAuthState } = require('../../models/integrat
 const { Plan } = require('../../models/subscription');
 const oauthService = require('../../services/etsy/oauthService');
 const shopSyncService = require('../../services/etsy/shopSyncService');
+const log = require('../../utils/logger')('EtsyCtrl');
 
 /**
  * GET /api/v1/customer/etsy/auth
@@ -35,7 +36,7 @@ const initiateAuth = async (req, res) => {
       data: { authUrl },
     });
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Etsy auth initiation error:`, error.message);
+    log.error('Etsy auth initiation error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to initiate Etsy authorization',
@@ -87,14 +88,14 @@ const handleCallback = async (req, res) => {
 
     // Trigger initial listing sync (non-blocking — runs in background)
     shopSyncService.syncListings(etsyShop)
-      .catch(err => console.error('[EtsyCallback] Initial sync failed:', err.message));
+      .catch(err => log.error('Initial sync failed:', err.message));
 
     // Redirect to frontend with success
     const frontendUrl = process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002';
     return res.redirect(`${frontendUrl}/dashboard?etsy_connected=true&shop=${encodeURIComponent(etsyShop.shopName)}`);
 
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Etsy OAuth callback error:`, error.message);
+    log.error('Etsy OAuth callback error:', error.message);
     const frontendUrl = process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002';
     return res.redirect(`${frontendUrl}/dashboard?etsy_error=connection_failed`);
   }
@@ -147,7 +148,7 @@ const getShopInfo = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get shop info error:', error.message);
+    log.error('Get shop info error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve shop information',
@@ -182,7 +183,7 @@ const disconnectShop = async (req, res) => {
       message: `Etsy shop "${shop.shopName}" disconnected successfully`,
     });
   } catch (error) {
-    console.error('Disconnect shop error:', error.message);
+    log.error('Disconnect shop error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to disconnect Etsy shop',
@@ -239,7 +240,7 @@ const getListings = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get listings error:', error.message);
+    log.error('Get listings error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve listings',
@@ -279,7 +280,7 @@ const syncNow = async (req, res) => {
       data: { jobId, status: 'running' },
     });
   } catch (error) {
-    console.error('Manual sync error:', error.message);
+    log.error('Manual sync error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to start sync',
@@ -322,7 +323,7 @@ const getSyncStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Sync status error:', error.message);
+    log.error('Sync status error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to get sync status',

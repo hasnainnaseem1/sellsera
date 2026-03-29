@@ -6,6 +6,7 @@
  */
 const User = require('../models/user/User');
 const emailService = require('../services/email/emailService');
+const log = require('../utils/logger')('CronTrialExpiry');
 
 const run = async () => {
   const now = new Date();
@@ -19,7 +20,7 @@ const run = async () => {
 
   if (expiredUsers.length === 0) return;
 
-  console.log(`[CRON] Found ${expiredUsers.length} expired trial(s)`);
+  log.info(`Found ${expiredUsers.length} expired trial(s)`);
 
   for (const user of expiredUsers) {
     try {
@@ -29,11 +30,11 @@ const run = async () => {
       // Send trial expired email (fire and forget)
       emailService.sendTrialExpiredEmail(user).catch(() => {});
     } catch (err) {
-      console.error(`[CRON] Failed to expire trial for ${user.email}:`, err.message);
+      log.error(`Failed to expire trial for ${user.email}:`, err.message);
     }
   }
 
-  console.log(`[CRON] Expired ${expiredUsers.length} trial(s)`);
+  log.info(`Expired ${expiredUsers.length} trial(s)`);
 };
 
 module.exports = { run };

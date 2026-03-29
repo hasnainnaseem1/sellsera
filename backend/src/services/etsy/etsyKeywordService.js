@@ -20,6 +20,7 @@
 const etsyApi = require('./etsyApiService');
 const redis = require('../cache/redisService');
 const crypto = require('crypto');
+const log = require('../../utils/logger')('KeywordService');
 
 /**
  * Search Etsy for a keyword and return enriched results.
@@ -28,6 +29,7 @@ const crypto = require('crypto');
  * @returns {{ success, listings, totalResults, error, code }}
  */
 const fetchListings = async (keyword, limit = 100) => {
+  log.info(`fetchListings: keyword="${keyword}" limit=${limit}`);
   const result = await etsyApi.publicRequest(
     'GET',
     '/v3/application/listings/active',
@@ -35,6 +37,7 @@ const fetchListings = async (keyword, limit = 100) => {
   );
 
   if (!result.success) {
+    log.error(`fetchListings: FAILED for "${keyword}" - code=${result.code} error=${result.error}`);
     return {
       success: false,
       listings: [],
@@ -44,6 +47,7 @@ const fetchListings = async (keyword, limit = 100) => {
     };
   }
 
+  log.info(`fetchListings: SUCCESS for "${keyword}" - ${result.data.count || 0} total, ${(result.data.results || []).length} returned`);
   return {
     success: true,
     listings: result.data.results || [],
@@ -61,10 +65,12 @@ const fetchListings = async (keyword, limit = 100) => {
  * @returns {{ success, results: Array, totalResults: number, serpCalls: number, error, errorCode }}
  */
 const getRelatedKeywords = async (seedKeyword) => {
+  log.info(`getRelatedKeywords: seedKeyword="${seedKeyword}"`);
   // Fetch top-100 listings for the seed keyword
   const primary = await fetchListings(seedKeyword, 100);
 
   if (!primary.success) {
+    log.error(`getRelatedKeywords: primary fetch FAILED for "${seedKeyword}" - code=${primary.code}`);
     return {
       success: false,
       results: [],
@@ -135,6 +141,8 @@ const getRelatedKeywords = async (seedKeyword) => {
 
   results.sort((a, b) => b.demandScore - a.demandScore);
   results.splice(20);
+
+  log.info(`getRelatedKeywords: SUCCESS for "${seedKeyword}" - ${results.length} keywords, totalResults=${totalResults}`);
 
   return {
     success: true,
@@ -212,10 +220,12 @@ function analyzeKeyword(kw, ctx) {
  * @returns {{ success, data, serpCalls, error, errorCode }}
  */
 const deepAnalyzeKeyword = async (seedKeyword) => {
+  log.info(`deepAnalyzeKeyword: seedKeyword="${seedKeyword}"`);
   // Primary search — get top listings + aggregate data
   const primary = await fetchListings(seedKeyword, 100);
 
   if (!primary.success) {
+    log.error(`deepAnalyzeKeyword: primary fetch FAILED for "${seedKeyword}" - code=${primary.code}`);
     return {
       success: false,
       data: null,
@@ -383,9 +393,13 @@ const deepAnalyzeKeyword = async (seedKeyword) => {
  * @returns {{ totalResults, competitionPct, competitionLevel }}
  */
 const getCompetitionData = async (keyword) => {
+  log.info(`getCompetitionData: keyword="${keyword}"`);
   const cacheKey = `kw:comp:${hashKey(keyword)}`;
   const cached = await redis.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    log.debug(`getCompetitionData: cache HIT for "${keyword}"`);
+    return cached;
+  }
 
   const result = await fetchListings(keyword, 5);
 

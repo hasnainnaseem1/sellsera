@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('AdminBlog');
 const BlogPost = require('../../models/admin/BlogPost');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
@@ -66,7 +67,7 @@ const listPosts = async (req, res) => {
       },
     }, req));
   } catch (err) {
-    console.error('Error fetching blog posts:', err);
+    log.error('Error fetching blog posts:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch blog posts' });
   }
 };
@@ -118,7 +119,7 @@ const getPost = async (req, res) => {
     }
     res.json(resolveFromReq({ success: true, post }, req));
   } catch (err) {
-    console.error('Error fetching blog post:', err);
+    log.error('Error fetching blog post:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch post' });
   }
 };
@@ -162,7 +163,7 @@ const createPost = async (req, res) => {
     await safeSave(post);
     res.status(201).json({ success: true, post });
   } catch (err) {
-    console.error('Error creating blog post:', err);
+    log.error('Error creating blog post:', err.message);
     if (err.code === 11000) {
       return res.status(400).json({ success: false, message: 'A post with this slug already exists' });
     }
@@ -212,7 +213,7 @@ const updatePost = async (req, res) => {
     await safeSave(post);
     res.json({ success: true, post });
   } catch (err) {
-    console.error('Error updating blog post:', err);
+    log.error('Error updating blog post:', err.message);
     if (err.code === 11000) {
       return res.status(400).json({ success: false, message: 'A post with this slug already exists' });
     }
@@ -232,7 +233,7 @@ const deletePost = async (req, res) => {
     }
     res.json({ success: true, message: 'Post deleted successfully' });
   } catch (err) {
-    console.error('Error deleting blog post:', err);
+    log.error('Error deleting blog post:', err.message);
     res.status(500).json({ success: false, message: 'Failed to delete post' });
   }
 };
@@ -255,7 +256,7 @@ const togglePostStatus = async (req, res) => {
     await safeSave(post);
     res.json({ success: true, post });
   } catch (err) {
-    console.error('Error updating post status:', err);
+    log.error('Error updating post status:', err.message);
     res.status(500).json({ success: false, message: 'Failed to update status' });
   }
 };
@@ -279,7 +280,7 @@ const bulkDeletePosts = async (req, res) => {
     });
     res.json({ success: true, message: `${result.deletedCount} post(s) deleted successfully`, deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Bulk delete blog posts error:', error);
+    log.error('Bulk delete blog posts error:', error.message);
     res.status(500).json({ success: false, message: 'Error deleting blog posts' });
   }
 };

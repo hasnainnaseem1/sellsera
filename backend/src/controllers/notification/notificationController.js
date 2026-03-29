@@ -9,6 +9,7 @@
  * - deleteNotification
  */
 const { Notification } = require('../../models/notification');
+const log = require('../../utils/logger')('NotifCtrl');
 
 /**
  * Get unread notification count
@@ -25,7 +26,7 @@ async function getUnreadCount(req, res) {
       unreadCount
     });
   } catch (error) {
-    console.error('Get unread count error:', error);
+    log.error('Get unread count error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching unread count'
@@ -48,7 +49,7 @@ async function markAllRead(req, res) {
       message: 'All notifications marked as read'
     });
   } catch (error) {
-    console.error('Mark all read error:', error);
+    log.error('Mark all read error:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating notifications'
@@ -87,7 +88,7 @@ async function getNotifications(req, res) {
       }
     });
   } catch (error) {
-    console.error('Get notifications error:', error);
+    log.error('Get notifications error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching notifications'
@@ -124,7 +125,7 @@ async function markAsRead(req, res) {
       notification
     });
   } catch (error) {
-    console.error('Mark as read error:', error);
+    log.error('Mark as read error:', error);
     res.status(500).json({
       success: false,
       message: 'Error updating notification'
@@ -160,7 +161,7 @@ async function deleteNotification(req, res) {
       message: 'Notification deleted'
     });
   } catch (error) {
-    console.error('Delete notification error:', error);
+    log.error('Delete notification error:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting notification'

@@ -9,6 +9,7 @@
  */
 
 const { ShopReceipt, SalesGeoSnapshot } = require('../../models/customer');
+const log = require('../../utils/logger')('Logistics');
 
 const REGION_MAP = {
   US: ['US'],
@@ -84,7 +85,7 @@ const getDeliveryStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[LogisticsController] getDeliveryStatus error:', error);
+    log.error('getDeliveryStatus error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve delivery status',
@@ -163,7 +164,7 @@ const getSalesMap = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[LogisticsController] getSalesMap error:', error);
+    log.error('getSalesMap error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve sales map data',
@@ -191,7 +192,7 @@ const getSalesMapHistory = async (req, res) => {
       data: { snapshots },
     });
   } catch (error) {
-    console.error('[LogisticsController] getSalesMapHistory error:', error);
+    log.error('getSalesMapHistory error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve sales map history',

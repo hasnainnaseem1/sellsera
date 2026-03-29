@@ -16,6 +16,7 @@ const { EtsyListing } = require('../../models/integrations');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
+const log = require('../../utils/logger')('ListingAudit');
 
 /**
  * POST /api/v1/customer/listing-audit
@@ -106,7 +107,7 @@ const auditListing = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Listing audit error:', error.message);
+    log.error('Listing audit error:', error.message, error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to audit listing',
@@ -144,7 +145,7 @@ const getAuditHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Audit history error:', error.message);
+    log.error('Audit history error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve audit history',
@@ -524,7 +525,7 @@ const getKeywordInsights = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Keyword insights error:', error.message);
+    log.error('Keyword insights error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch keyword insights',

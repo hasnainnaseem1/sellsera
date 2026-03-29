@@ -1,3 +1,4 @@
+const log = require('./utils/logger')('App');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -32,13 +33,23 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// Request Logging (Development only)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
-    next();
+// Request Logging — all environments, with timestamps
+const reqLog = require('./utils/logger')('HTTP');
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const line = `${req.method} ${req.originalUrl} → ${res.statusCode} (${duration}ms)`;
+    if (res.statusCode >= 500) {
+      reqLog.error(line);
+    } else if (res.statusCode >= 400) {
+      reqLog.warn(line);
+    } else {
+      reqLog.info(line);
+    }
   });
-}
+  next();
+});
 
 // ==========================================
 // MAINTENANCE MODE CHECK
@@ -95,7 +106,7 @@ app.use((req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  log.error(`${req.method} ${req.originalUrl} — ${err.message}`);
   
   const errorMessage = process.env.NODE_ENV === 'production' 
     ? 'Internal server error' 

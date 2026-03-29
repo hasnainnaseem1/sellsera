@@ -1,6 +1,7 @@
 const BlogPost = require('../../models/admin/BlogPost');
 const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 const escapeRegex = require('../../utils/helpers/escapeRegex');
+const log = require('../../utils/logger')('BlogCtrl');
 
 /**
  * GET /api/v1/public/blog/posts
@@ -62,7 +63,7 @@ const getPosts = async (req, res) => {
       },
     }, req));
   } catch (err) {
-    console.error('Error fetching public blog posts:', err);
+    log.error('Error fetching public blog posts:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch blog posts' });
   }
 };
@@ -133,7 +134,7 @@ const getPostBySlug = async (req, res) => {
 
     res.json(resolveFromReq({ success: true, post, related }, req));
   } catch (err) {
-    console.error('Error fetching blog post:', err);
+    log.error('Error fetching blog post:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch post' });
   }
 };

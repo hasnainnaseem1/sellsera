@@ -7,6 +7,7 @@
  */
 const User = require('../models/user/User');
 const UsageLog = require('../models/subscription/UsageLog');
+const log = require('../utils/logger')('CronUsageReset');
 
 const run = async () => {
   const now = new Date();
@@ -20,7 +21,7 @@ const run = async () => {
 
   if (usersToReset.length === 0) return;
 
-  console.log(`[CRON] Resetting usage for ${usersToReset.length} user(s)`);
+  log.info(`Resetting usage for ${usersToReset.length} user(s)`);
 
   for (const user of usersToReset) {
     try {
@@ -42,11 +43,11 @@ const run = async () => {
         metadata: { resetAt: now },
       });
     } catch (err) {
-      console.error(`[CRON] Failed to reset usage for ${user.email}:`, err.message);
+      log.error(`Failed to reset usage for ${user.email}:`, err.message);
     }
   }
 
-  console.log(`[CRON] Reset usage for ${usersToReset.length} user(s)`);
+  log.info(`Reset usage for ${usersToReset.length} user(s)`);
 };
 
 module.exports = { run };

@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('EmailValidator');
 const dns = require('dns').promises;
 const AdminSettings = require('../../models/admin/AdminSettings');
 
@@ -90,12 +91,12 @@ const validateEmail = async (req, res, next) => {
       // DNS lookup failed — log a warning but allow the signup to proceed.
       // Blocking on DNS failure rejects legitimate domains when the server
       // has connectivity issues or restrictive DNS settings.
-      console.warn(`[EMAIL-VALIDATOR] MX lookup failed for ${domain}: ${dnsError.message} — allowing anyway`);
+      log.warn(`MX lookup failed for ${domain}: ${dnsError.message} — allowing anyway`);
     }
 
     next();
   } catch (error) {
-    console.error('Email validation error:', error);
+    log.error('Email validation error:', error.message);
     // Don't block the request if validation fails
     // Let it proceed and handle errors downstream
     next();

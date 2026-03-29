@@ -19,6 +19,7 @@ const { ShopReceipt } = require('../../models/customer');
 const { EtsyShop } = require('../../models/integrations');
 const etsyApi = require('./etsyApiService');
 const syncJobManager = require('./syncJobManager');
+const log = require('../../utils/logger')('ShopSync');
 
 /**
  * Sync active listings for a shop.
@@ -40,7 +41,7 @@ const syncListings = async (etsyShop, jobId = null) => {
     let hasMore = true;
 
     while (hasMore) {
-      console.log(`[ShopSync] Fetching listings for shop ${etsyShop.shopId} (offset: ${offset})`);
+      log.info(`Fetching listings for shop ${etsyShop.shopId} (offset: ${offset})`);
 
       const result = await etsyApi.authenticatedRequest(
         etsyShop,
@@ -50,7 +51,7 @@ const syncListings = async (etsyShop, jobId = null) => {
       );
 
       if (!result.success) {
-        console.error(`[ShopSync] API call failed for shop ${etsyShop.shopId}:`, result.error, result.code);
+        log.error(`API call failed for shop ${etsyShop.shopId}:`, result.error, result.code);
         // If token was revoked during sync, stop
         if (result.code === 'SHOP_TOKEN_REVOKED') {
           return { success: false, syncedCount: totalSynced, error: 'Token revoked during sync' };
@@ -58,7 +59,7 @@ const syncListings = async (etsyShop, jobId = null) => {
         break;
       }
 
-      console.log(`[ShopSync] Got ${result.data?.results?.length || 0} listings (count: ${result.data?.count})`);
+      log.info(`Got ${result.data?.results?.length || 0} listings (count: ${result.data?.count})`);
 
       // Report total estimate on first page
       if (offset === 0 && jobId) {
@@ -118,7 +119,7 @@ const syncListings = async (etsyShop, jobId = null) => {
     return { success: true, syncedCount: totalSynced };
 
   } catch (error) {
-    console.error(`[ShopSync] Listing sync error for shop ${etsyShop.shopId}:`, error.message);
+    log.error(`Listing sync error for shop ${etsyShop.shopId}:`, error.message);
     // Don't leave shop in syncing state
     if (etsyShop.status === 'syncing') {
       etsyShop.status = 'active';
@@ -207,7 +208,7 @@ const syncReceipts = async (etsyShop) => {
     return { success: true, syncedCount: totalSynced };
 
   } catch (error) {
-    console.error(`[ShopSync] Receipt sync error for shop ${etsyShop.shopId}:`, error.message);
+    log.error(`Receipt sync error for shop ${etsyShop.shopId}:`, error.message);
     return { success: false, syncedCount: 0, error: error.message };
   }
 };
@@ -252,10 +253,10 @@ const asyncFullSync = (etsyShop) => {
       const result = await fullSync(etsyShop, jobId);
       const syncedCount = result.listings.syncedCount || 0;
       syncJobManager.completeJob(jobId, { syncedCount });
-      console.log(`[ShopSync] Async sync completed for shop ${etsyShop.shopId}: ${syncedCount} listings`);
+      log.info(`Async sync completed for shop ${etsyShop.shopId}: ${syncedCount} listings`);
     } catch (err) {
       syncJobManager.failJob(jobId, err.message);
-      console.error(`[ShopSync] Async sync failed for shop ${etsyShop.shopId}:`, err.message);
+      log.error(`Async sync failed for shop ${etsyShop.shopId}:`, err.message);
     }
   })();
 

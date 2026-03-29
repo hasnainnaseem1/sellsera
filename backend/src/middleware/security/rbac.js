@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('RBAC');
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 /**
@@ -81,7 +82,7 @@ const checkPermission = (requiredPermissions, requireAll = false) => {
 
       next();
     } catch (error) {
-      console.error('RBAC middleware error:', error);
+      log.error('RBAC middleware error:', error.message);
       res.status(500).json({
         success: false,
         message: 'Permission check failed'
@@ -140,7 +141,7 @@ const checkRole = (roles) => {
 
       next();
     } catch (error) {
-      console.error('Role check middleware error:', error);
+      log.error('Role check middleware error:', error.message);
       res.status(500).json({
         success: false,
         message: 'Role check failed'

@@ -4,6 +4,7 @@
  * Handles customer-facing plan listing.
  */
 const Plan = require('../../models/subscription/Plan');
+const log = require('../../utils/logger')('PlansCtrl');
 
 /**
  * Get all active plans for customer browsing
@@ -40,7 +41,7 @@ const getPlans = async (req, res) => {
 
     res.json({ success: true, plans: plansWithCurrent });
   } catch (error) {
-    console.error('Get customer plans error:', error);
+    log.error('Get customer plans error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch plans' });
   }
 };
@@ -77,7 +78,7 @@ const getPublicPlans = async (req, res) => {
 
     res.json({ success: true, plans: publicPlans });
   } catch (error) {
-    console.error('Get public plans error:', error);
+    log.error('Get public plans error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch plans' });
   }
 };

@@ -11,6 +11,7 @@ const usageReset = require('./usageReset');
 const shopSync = require('./shopSync');
 const competitorSync = require('./competitorSync');
 const apiKeyReset = require('./apiKeyReset');
+const log = require('../utils/logger')('Cron');
 
 /* ─── Built-in system jobs ─── */
 const systemJobs = {
@@ -137,7 +138,7 @@ const buildCustomRunner = (job) => {
         subject: cfg.subject,
         html: cfg.body || '<p>Scheduled email from cron job</p>',
       });
-      console.log(`[CUSTOM-CRON] Email sent to ${cfg.to}`);
+      log.info(`Email sent to ${cfg.to}`);
     };
   }
 
@@ -183,7 +184,7 @@ const buildCustomRunner = (job) => {
         );
         deleted = result.modifiedCount;
       }
-      console.log(`[CUSTOM-CRON] Cleanup "${target}": removed/cleaned ${deleted} records older than ${days} days`);
+      log.info(`Cleanup "${target}": removed/cleaned ${deleted} records older than ${days} days`);
     };
   }
 
@@ -208,7 +209,7 @@ const buildCustomRunner = (job) => {
         priority: 'medium',
       }));
       await Notification.insertMany(docs);
-      console.log(`[CUSTOM-CRON] Notification "${cfg.title}" sent to ${admins.length} admin(s)`);
+      log.info(`Notification "${cfg.title}" sent to ${admins.length} admin(s)`);
     };
   }
 
@@ -233,30 +234,30 @@ const buildCustomRunner = (job) => {
           const docs = await coll.find({}).toArray();
           const filePath = path.join(batchDir, `${collName}.json`);
           fs.writeFileSync(filePath, JSON.stringify(docs, null, 2));
-          console.log(`[CUSTOM-CRON] Backup: ${collName} → ${docs.length} docs exported`);
+          log.info(`Backup: ${collName} → ${docs.length} docs exported`);
         } catch (err) {
-          console.error(`[CUSTOM-CRON] Backup: failed to export "${collName}" — ${err.message}`);
+          log.error(`Backup: failed to export "${collName}" — ${err.message}`);
         }
       }
-      console.log(`[CUSTOM-CRON] Backup complete → ${batchDir}`);
+      log.info(`Backup complete → ${batchDir}`);
     };
   }
 
   // default: log
   return async () => {
-    console.log(`[CUSTOM-CRON] ${job.logMessage || 'Custom job executed'}`);
+    log.info(`${job.logMessage || 'Custom job executed'}`);
   };
 };
 
 const scheduleTask = (key, job, runner) => {
   if (job.task) { job.task.stop(); job.task = null; }
   if (!cron.validate(job.schedule)) {
-    console.error(`[CRON] Invalid schedule for ${key}: ${job.schedule}`);
+    log.error(`Invalid schedule for ${key}: ${job.schedule}`);
     return;
   }
   job.task = cron.schedule(job.schedule, async () => {
     if (!job.enabled) return;
-    console.log(`[CRON] Running ${job.name}...`);
+    log.info(`Running ${job.name}...`);
     try {
       await runner();
       job.lastRun = new Date();
@@ -269,7 +270,7 @@ const scheduleTask = (key, job, runner) => {
       job.lastRun = new Date();
       job.lastStatus = 'error';
       job.lastError = err.message;
-      console.error(`[CRON] ${job.name} error:`, err.message);
+      log.error(`${job.name} error:`, err.message);
       if (!job.system) persistStats(key, job);
     }
   });
@@ -287,7 +288,7 @@ const persistStats = async (key, job) => {
 
 /* ─── Initialization ─── */
 const initializeJobs = async () => {
-  console.log('⏰ Initializing scheduled jobs...');
+  log.info('Initializing scheduled jobs...');
 
   // 1. Start system jobs
   Object.keys(systemJobs).forEach((key) => {
@@ -322,18 +323,12 @@ const initializeJobs = async () => {
       customJobs[doc.key] = entry;
       if (entry.enabled) scheduleTask(doc.key, entry, buildCustomRunner(doc));
     }
-    if (dbJobs.length) console.log(`   • ${dbJobs.length} custom job(s) loaded from DB`);
+    if (dbJobs.length) log.info(`${dbJobs.length} custom job(s) loaded from DB`);
   } catch (err) {
-    console.error('[CRON] Error loading custom jobs:', err.message);
+    log.error('Error loading custom jobs:', err.message);
   }
 
-  console.log('✅ Scheduled jobs initialized:');
-  console.log('   • Trial expiry check — every hour');
-  console.log('   • Trial warning emails — daily at 9 AM');
-  console.log('   • Usage reset — every hour');
-  console.log('   • Etsy shop sync — daily at 3 AM');
-  console.log('   • Competitor sync — daily at 4 AM');
-  console.log('   • API key counter reset — daily at midnight');
+  log.info('Scheduled jobs initialized: trialExpiry(1h), trialWarning(9AM), usageReset(1h), shopSync(3AM), competitorSync(4AM), apiKeyReset(midnight)');
 };
 
 /* ─── API methods ─── */
@@ -392,7 +387,7 @@ const triggerJob = async (key) => {
   if (!job) throw new Error(`Unknown job: ${key}`);
 
   const runner = sysJob ? systemRunners[key] : buildCustomRunner(cusJob);
-  console.log(`[CRON] Manual trigger: ${job.name}`);
+  log.info(`Manual trigger: ${job.name}`);
   try {
     await runner();
     job.lastRun = new Date();

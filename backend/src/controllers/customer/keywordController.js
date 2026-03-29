@@ -13,6 +13,7 @@ const { SerpCostLog } = require('../../models/customer');
 const keywordService = require('../../services/etsy/etsyKeywordService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
+const log = require('../../utils/logger')('KeywordCtrl');
 
 const SERP_COST_PER_REQ = 0.0025;
 
@@ -23,6 +24,7 @@ const SERP_COST_PER_REQ = 0.0025;
 const searchKeywords = async (req, res) => {
   try {
     const { keyword } = req.body;
+    log.info(`searchKeywords: userId=${req.userId} keyword="${keyword}"`);
 
     if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
       return res.status(400).json({
@@ -57,6 +59,7 @@ const searchKeywords = async (req, res) => {
 
     // Distinguish API error from genuine 0 results
     if (!searchData.success) {
+      log.error(`searchKeywords: API FAILED for "${seedKeyword}" - errorCode=${searchData.errorCode} detail=${searchData.error}`);
       return res.status(502).json({
         success: false,
         message: 'Unable to fetch keyword data from Etsy',
@@ -66,6 +69,8 @@ const searchKeywords = async (req, res) => {
     }
 
     const results = searchData.results;
+
+    log.info(`searchKeywords: SUCCESS for "${seedKeyword}" - ${results.length} results, ${searchData.serpCalls} SERP calls`);
 
     // Cache results (even if empty — means the keyword genuinely has no data)
     await redis.set(cacheKey, results, 21600);
@@ -102,7 +107,7 @@ const searchKeywords = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Keyword search error:', error.message);
+    log.error(`searchKeywords: EXCEPTION - ${error.message}`, error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to search keywords',
@@ -191,7 +196,7 @@ const deepAnalysis = async (req, res) => {
       data,
     });
   } catch (error) {
-    console.error('Deep keyword analysis error:', error.message);
+    log.error(`deepAnalysis: EXCEPTION - ${error.message}`, error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to perform deep analysis',
@@ -231,7 +236,7 @@ const getKeywordHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Keyword history error:', error.message);
+    log.error('Keyword history error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve keyword history',

@@ -25,6 +25,7 @@ const { notifySubscriptionChange } = require('../../services/notification/adminN
 const { generateSignedInvoiceUrl } = require('../../controllers/customer/billingController');
 const lemonSqueezyService = require('../../services/lemonsqueezy/lemonSqueezyService');
 const { safeSave } = require('../../utils/helpers/safeDbOps');
+const log = require('../../utils/logger')('LemonSqueezy');
 
 const TAG = '[LemonSqueezy]';
 
@@ -63,19 +64,19 @@ const handleSubscriptionCreated = async (event, customData) => {
   const { user_id: userId, plan_id: planId, plan_name: planName, billing_cycle: billingCycle = 'monthly' } = customData;
 
   if (!userId || !planId) {
-    console.error(`${TAG} subscription_created missing user_id or plan_id in custom_data`);
+    log.error('subscription_created missing user_id or plan_id in custom_data');
     return;
   }
 
   const user = await User.findById(userId);
   if (!user) {
-    console.error(`${TAG} User not found: ${userId}`);
+    log.error(`User not found: ${userId}`);
     return;
   }
 
   const plan = await Plan.findById(planId);
   if (!plan) {
-    console.error(`${TAG} Plan not found: ${planId}`);
+    log.error(`Plan not found: ${planId}`);
     return;
   }
 
@@ -127,7 +128,7 @@ const handleSubscriptionCreated = async (event, customData) => {
     source: 'lemonsqueezy',
   }).catch(() => {});
 
-  console.log(`${TAG} Subscription created: ${user.email} → ${plan.name}`);
+  log.info(`Subscription created: ${user.email} → ${plan.name}`);
 };
 
 // ──────────────────────────────────────────────
@@ -158,7 +159,7 @@ const handleSubscriptionUpdated = async (event, customData) => {
       source: 'lemonsqueezy',
     }).catch(() => {});
 
-    console.log(`${TAG} Subscription updated: ${user.email} → ${newStatus}`);
+    log.info(`Subscription updated: ${user.email} → ${newStatus}`);
   }
 };
 
@@ -184,7 +185,7 @@ const handleSubscriptionCancelled = async (event, customData) => {
     source: 'lemonsqueezy',
   }).catch(() => {});
 
-  console.log(`${TAG} Subscription cancelled: ${user.email}`);
+  log.info(`Subscription cancelled: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -200,7 +201,7 @@ const handleSubscriptionResumed = async (event, customData) => {
   }
   await safeSave(user);
 
-  console.log(`${TAG} Subscription resumed: ${user.email}`);
+  log.info(`Subscription resumed: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -224,7 +225,7 @@ const handleSubscriptionExpired = async (event, customData) => {
     source: 'lemonsqueezy',
   }).catch(() => {});
 
-  console.log(`${TAG} Subscription expired: ${user.email}`);
+  log.info(`Subscription expired: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -237,7 +238,7 @@ const handleSubscriptionPaused = async (event, customData) => {
   user.subscriptionStatus = 'cancelled';
   await safeSave(user);
 
-  console.log(`${TAG} Subscription paused: ${user.email}`);
+  log.info(`Subscription paused: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -253,7 +254,7 @@ const handleSubscriptionUnpaused = async (event, customData) => {
   }
   await safeSave(user);
 
-  console.log(`${TAG} Subscription unpaused: ${user.email}`);
+  log.info(`Subscription unpaused: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -300,7 +301,7 @@ const handleOrderCreated = async (event, customData) => {
     paidAt: attrs.created_at ? new Date(attrs.created_at) : new Date(),
   }).catch(() => {});
 
-  console.log(`${TAG} Order created: ${user.email}, $${(attrs.total || 0) / 100}`);
+  log.info(`Order created: ${user.email}, $${(attrs.total || 0) / 100}`);
 };
 
 // ──────────────────────────────────────────────
@@ -352,7 +353,7 @@ const handlePaymentSuccess = async (event, customData) => {
     await safeSave(user);
   }
 
-  console.log(`${TAG} Payment success: ${user.email}`);
+  log.info(`Payment success: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -386,7 +387,7 @@ const handlePaymentFailed = async (event, customData) => {
     currency: attrs.currency || 'usd',
   }).catch(() => {});
 
-  console.log(`${TAG} Payment failed: ${user.email}`);
+  log.info(`Payment failed: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -428,7 +429,7 @@ const handleWebhook = async (req, res) => {
     // Verify HMAC signature
     const webhookSecret = await lemonSqueezyService.getWebhookSecret();
     if (!webhookSecret) {
-      console.error('[LemonSqueezy] Webhook secret not configured in Admin Settings');
+      log.error('Webhook secret not configured in Admin Settings');
       return res.status(500).json({ error: 'Webhook secret not configured' });
     }
 
@@ -436,12 +437,12 @@ const handleWebhook = async (req, res) => {
     try {
       isValid = lemonSqueezyService.verifyWebhookSignature(payload, signature, webhookSecret);
     } catch (err) {
-      console.error('[LemonSqueezy] Signature check threw:', err.message);
+      log.error('Signature check threw:', err.message);
       return res.status(400).json({ error: 'Signature verification failed' });
     }
 
     if (!isValid) {
-      console.error('[LemonSqueezy] Invalid signature — check that the webhook secret in Admin Settings matches LemonSqueezy dashboard');
+      log.error('Invalid signature — check that the webhook secret in Admin Settings matches LemonSqueezy dashboard');
       return res.status(400).json({ error: 'Invalid signature' });
     }
 
@@ -461,16 +462,16 @@ const handleWebhook = async (req, res) => {
       if (handler) {
         await handler(event, customData);
       } else {
-        console.log(`${TAG} Unhandled event: ${eventName}`);
+        log.info(`Unhandled event: ${eventName}`);
       }
 
       res.json({ received: true });
     } catch (err) {
-      console.error(`${TAG} Error handling ${eventName}:`, err);
+      log.error(`Error handling ${eventName}:`, err);
       res.status(500).json({ error: 'Webhook handler failed' });
     }
   } catch (err) {
-    console.error('[LemonSqueezy] Unhandled controller error:', err);
+    log.error('Unhandled controller error:', err);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Internal server error' });
     }

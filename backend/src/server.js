@@ -1,3 +1,4 @@
+const log = require('./utils/logger')('Server');
 const mongoose = require('mongoose');
 const app = require('./app');
 const { initializeJobs } = require('./jobs');
@@ -15,22 +16,22 @@ const connectDB = async () => {
       useUnifiedTopology: true
     });
     
-    console.log('✅ MongoDB connected successfully');
-    console.log(`📦 Database: ${mongoose.connection.name}`);
+    log.info('MongoDB connected successfully');
+    log.info(`Database: ${mongoose.connection.name}`);
     
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error.message);
+    log.error('MongoDB connection error:', error.message);
     process.exit(1);
   }
 };
 
 // Handle connection events
 mongoose.connection.on('disconnected', () => {
-  console.log('⚠️  MongoDB disconnected');
+  log.warn('MongoDB disconnected');
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB error:', err);
+  log.error('MongoDB error:', err.message);
 });
 
 // ==========================================
@@ -47,7 +48,7 @@ const startServer = async () => {
   if (!process.env.FRONTEND_URL) missingEnvVars.push('FRONTEND_URL');
   if (!process.env.ADMIN_FRONTEND_URL) missingEnvVars.push('ADMIN_FRONTEND_URL');
   if (missingEnvVars.length > 0) {
-    console.warn(`⚠️  Missing env vars: ${missingEnvVars.join(', ')} — email links will fallback to localhost!`);
+    log.warn(`Missing env vars: ${missingEnvVars.join(', ')} — email links will fallback to localhost!`);
   }
 
   // Connect to database first
@@ -63,20 +64,20 @@ const startServer = async () => {
 
     console.log('');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🚀 Server Started Successfully');
+    log.info('Server Started Successfully');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`📍 Environment: ${NODE_ENV}`);
+    log.info(`Environment: ${NODE_ENV}`);
     const HOST = process.env.HOST || 'localhost';
     const BASE = `http://${HOST}:${PORT}`;
-    console.log(`🌐 Server: ${BASE}`);
-    console.log(`📡 API Base: ${BASE}/api`);
-    console.log(`🏥 Health Check: ${BASE}/api/health`);
+    log.info(`Server: ${BASE}`);
+    log.info(`API Base: ${BASE}/api`);
+    log.info(`Health Check: ${BASE}/api/health`);
     console.log('');
-    console.log('Available Endpoints:');
-    console.log(`   Customer Login:  POST ${BASE}/api/v1/auth/customer/login`);
-    console.log(`   Admin Login:   POST ${BASE}/api/v1/auth/admin/login`);
-    console.log(`   Analysis:      POST ${BASE}/api/v1/customer/analysis`);
-    console.log(`   Analytics:     GET  ${BASE}/api/v1/admin/analytics/overview`);
+    log.info('Available Endpoints:');
+    log.info(`   Customer Login:  POST ${BASE}/api/v1/auth/customer/login`);
+    log.info(`   Admin Login:   POST ${BASE}/api/v1/auth/admin/login`);
+    log.info(`   Analysis:      POST ${BASE}/api/v1/customer/analysis`);
+    log.info(`   Analytics:     GET  ${BASE}/api/v1/admin/analytics/overview`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('');
   });
@@ -87,16 +88,16 @@ const startServer = async () => {
 // ==========================================
 
 const gracefulShutdown = async () => {
-  console.log('\n🔄 Shutting down gracefully...');
+  log.info('Shutting down gracefully...');
   
   try {
     // Close database connection
     await mongoose.connection.close();
-    console.log('✅ MongoDB connection closed');
+    log.info('MongoDB connection closed');
     
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error during shutdown:', error);
+    log.error('Error during shutdown:', error.message);
     process.exit(1);
   }
 };
@@ -107,7 +108,7 @@ process.on('SIGINT', gracefulShutdown);
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled Promise Rejection:', err);
+  log.error('Unhandled Promise Rejection:', err);
   gracefulShutdown();
 });
 

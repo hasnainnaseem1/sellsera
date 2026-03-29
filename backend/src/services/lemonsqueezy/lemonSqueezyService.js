@@ -9,6 +9,7 @@
  */
 const crypto = require('crypto');
 const { AdminSettings } = require('../../models/admin');
+const log = require('../../utils/logger')('LemonSqueezy');
 
 const LEMONSQUEEZY_API_BASE = 'https://api.lemonsqueezy.com/v1';
 
@@ -80,7 +81,7 @@ class LemonSqueezyService {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('[LemonSqueezy] API error:', {
+      log.error('API error:', {
         status: response.status,
         url,
         errors: data.errors,
@@ -128,7 +129,7 @@ class LemonSqueezyService {
       );
     }
 
-    console.log('[LemonSqueezy] createCheckout →', {
+    log.info('createCheckout →', {
       storeId: this.storeId,
       variantId,
       planName: plan.name,

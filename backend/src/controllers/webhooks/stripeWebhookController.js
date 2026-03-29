@@ -11,6 +11,7 @@
  * - customer.subscription.updated → sync status
  * - customer.subscription.deleted → cancel subscription
  */
+const log = require('../../utils/logger')('StripeWebhook');
 const User = require('../../models/user/User');
 const Plan = require('../../models/subscription/Plan');
 const Payment = require('../../models/payment/Payment');
@@ -27,19 +28,19 @@ const { safeSave } = require('../../utils/helpers/safeDbOps');
 async function handleCheckoutComplete(session) {
   const { userId, planId, planName, billingCycle } = session.metadata || {};
   if (!userId || !planId) {
-    console.error('[Stripe] checkout.session.completed missing metadata');
+    log.error('checkout.session.completed missing metadata');
     return;
   }
 
   const user = await User.findById(userId);
   if (!user) {
-    console.error('[Stripe] User not found:', userId);
+    log.error('User not found:', userId);
     return;
   }
 
   const plan = await Plan.findById(planId);
   if (!plan) {
-    console.error('[Stripe] Plan not found:', planId);
+    log.error('Plan not found:', planId);
     return;
   }
 
@@ -104,7 +105,7 @@ async function handleCheckoutComplete(session) {
     source: 'stripe',
   }).catch(() => {});
 
-  console.log(`[Stripe] Checkout complete: ${user.email} → ${plan.name} (${changeType})`);
+  log.info(`Checkout complete: ${user.email} → ${plan.name} (${changeType})`);
 }
 
 /**
@@ -158,7 +159,7 @@ async function handleInvoicePaid(invoice) {
     paidAt: new Date(invoice.status_transitions?.paid_at * 1000 || Date.now()),
   }).catch(() => {});
 
-  console.log(`[Stripe] Invoice paid: ${user.email}, $${(invoice.amount_paid || 0) / 100}`);
+  log.info(`Invoice paid: ${user.email}, $${(invoice.amount_paid || 0) / 100}`);
 }
 
 /**
@@ -188,7 +189,7 @@ async function handlePaymentFailed(invoice) {
     currency: invoice.currency || 'usd',
   }).catch(() => {});
 
-  console.log(`[Stripe] Payment failed: ${user.email}`);
+  log.info(`Payment failed: ${user.email}`);
 }
 
 /**
@@ -257,7 +258,7 @@ async function handleSubscriptionUpdated(subscription) {
       source: 'stripe',
     }).catch(() => {});
 
-    console.log(`[Stripe] Subscription updated: ${user.email} → ${newStatus}`);
+    log.info(`Subscription updated: ${user.email} → ${newStatus}`);
   }
 }
 
@@ -286,7 +287,7 @@ async function handleSubscriptionDeleted(subscription) {
     source: 'stripe',
   }).catch(() => {});
 
-  console.log(`[Stripe] Subscription deleted: ${user.email}`);
+  log.info(`Subscription deleted: ${user.email}`);
 }
 
 /**
@@ -300,7 +301,7 @@ async function handleWebhook(req, res) {
   try {
     event = await stripeService.constructWebhookEvent(req.body, signature);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
+    log.error('Webhook signature verification failed:', err.message);
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
@@ -327,12 +328,12 @@ async function handleWebhook(req, res) {
         break;
 
       default:
-        console.log(`[Stripe] Unhandled event type: ${event.type}`);
+        log.info(`Unhandled event type: ${event.type}`);
     }
 
     res.json({ received: true });
   } catch (err) {
-    console.error(`[Stripe] Error handling ${event.type}:`, err);
+    log.error(`Error handling ${event.type}:`, err.message);
     res.status(500).json({ error: 'Webhook handler failed' });
   }
 }

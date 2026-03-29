@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('Maintenance');
 /**
  * Maintenance Mode Middleware
  *
@@ -48,7 +49,7 @@ const getMaintenanceSettings = async () => {
     cacheExpiry = now + CACHE_TTL;
     return cachedSettings;
   } catch (err) {
-    console.error('Error checking maintenance mode:', err);
+    log.error('Error checking maintenance mode:', err.message);
     // Fail-open: don't block requests if we can't read settings
     return { enabled: false, message: '', allowAdminAccess: true };
   }

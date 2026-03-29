@@ -6,6 +6,7 @@
  */
 const User = require('../models/user/User');
 const emailService = require('../services/email/emailService');
+const log = require('../utils/logger')('CronTrialWarn');
 
 const run = async () => {
   const now = new Date();
@@ -22,7 +23,7 @@ const run = async () => {
 
   if (warningUsers.length === 0) return;
 
-  console.log(`[CRON] Sending trial warning to ${warningUsers.length} user(s)`);
+  log.info(`Sending trial warning to ${warningUsers.length} user(s)`);
 
   for (const user of warningUsers) {
     try {
@@ -32,7 +33,7 @@ const run = async () => {
       user.trialWarningEmailSent = true;
       await user.save();
     } catch (err) {
-      console.error(`[CRON] Failed to send trial warning to ${user.email}:`, err.message);
+      log.error(`Failed to send trial warning to ${user.email}:`, err.message);
     }
   }
 };

@@ -2,6 +2,7 @@
 const { AdminSettings } = require('../../models/admin');
 const { defaults: defaultTemplates } = require('./defaultTemplates');
 const { resolveFromEnv } = require('../../utils/helpers/urlHelper');
+const log = require('../../utils/logger')('Email');
 
 class EmailService {
   constructor() {
@@ -48,7 +49,7 @@ class EmailService {
     });
 
     this._configHash = hash;
-    console.log(`[EMAIL] SMTP transporter created > ${ec.smtpHost}:${port} (pool, secure=${useSecure})`);
+    log.info(`SMTP transporter created > ${ec.smtpHost}:${port} (pool, secure=${useSecure})`);
     return { transporter: this.transporter, settings };
   }
 
@@ -136,12 +137,12 @@ class EmailService {
       const fromName = ec.fromName || siteName;
       const { subject, html, text } = this._buildEmail(settings, 'verification', { verificationLink }, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Verification email sent:', info.messageId, '>', user.email);
+      log.info('Verification email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send verification email:', error.message);
+      log.error('Failed to send verification email:', error.message);
       if (process.env.NODE_ENV === 'development') {
-        console.log('\n[DEV] Verification link for', user.email, ':\n', verificationLink, '\n');
+        log.info('[DEV] Verification link for', user.email, ':', verificationLink);
       }
       return { success: false, error: error.message };
     }
@@ -156,10 +157,10 @@ class EmailService {
       const effectiveLoginLink = loginLink || process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002';
       const { subject, html, text } = this._buildEmail(settings, 'welcome', { loginLink: effectiveLoginLink }, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Welcome email sent:', info.messageId, '>', user.email);
+      log.info('Welcome email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send welcome email:', error.message);
+      log.error('Failed to send welcome email:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -172,12 +173,12 @@ class EmailService {
       const fromName = ec.fromName || siteName;
       const { subject, html, text } = this._buildEmail(settings, 'passwordReset', { resetLink }, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Password reset email sent:', info.messageId, '>', user.email);
+      log.info('Password reset email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send password reset email:', error.message);
+      log.error('Failed to send password reset email:', error.message);
       if (process.env.NODE_ENV === 'development') {
-        console.log('\n[DEV] Password reset link for', user.email, ':\n', resetLink, '\n');
+        log.info('[DEV] Password reset link for', user.email, ':', resetLink);
       }
       return { success: false, error: error.message };
     }
@@ -191,10 +192,10 @@ class EmailService {
       const fromName = ec.fromName || siteName;
       const { subject, html, text } = this._buildEmail(settings, 'planChange', { oldPlanName: oldPlanName || 'None', newPlanName: newPlanName || 'Unknown' }, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Plan change email sent:', info.messageId, '>', user.email);
+      log.info('Plan change email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send plan change email:', error.message);
+      log.error('Failed to send plan change email:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -208,10 +209,10 @@ class EmailService {
       const customerUrl = process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002';
       const { subject, html, text } = this._buildEmail(settings, 'trialWarning', { daysRemaining: String(daysRemaining), planName: (user.planSnapshot && user.planSnapshot.planName) || 'your plan', upgradeLink: customerUrl + '/plans' }, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Trial warning email sent:', info.messageId, '>', user.email);
+      log.info('Trial warning email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send trial warning email:', error.message);
+      log.error('Failed to send trial warning email:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -225,10 +226,10 @@ class EmailService {
       const customerUrl = process.env.CUSTOMER_FRONTEND_URL || 'http://localhost:3002';
       const { subject, html, text } = this._buildEmail(settings, 'trialExpired', { planName: (user.planSnapshot && user.planSnapshot.planName) || 'your plan', upgradeLink: customerUrl + '/plans' }, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Trial expired email sent:', info.messageId, '>', user.email);
+      log.info('Trial expired email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send trial expired email:', error.message);
+      log.error('Failed to send trial expired email:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -262,10 +263,10 @@ class EmailService {
 
       const { subject, html, text } = this._buildEmail(settings, 'paymentConfirmation', vars, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Payment confirmation email sent:', info.messageId, '>', user.email);
+      log.info('Payment confirmation email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send payment confirmation email:', error.message);
+      log.error('Failed to send payment confirmation email:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -293,10 +294,10 @@ class EmailService {
 
       const { subject, html, text } = this._buildEmail(settings, 'paymentFailed', vars, user);
       const info = await transporter.sendMail({ from: '"' + fromName + '" <' + ec.fromEmail + '>', to: user.email, subject, html, text });
-      console.log('Payment failed email sent:', info.messageId, '>', user.email);
+      log.info('Payment failed email sent:', info.messageId, '>', user.email);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send payment failed email:', error.message);
+      log.error('Failed to send payment failed email:', error.message);
       return { success: false, error: error.message };
     }
   }
@@ -326,10 +327,10 @@ class EmailService {
         '<p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">Sent on ' + new Date().toLocaleString() + '</p>';
       const html = this._wrapInLayout(innerHtml, vars);
       const info = await transporter.sendMail({ from: '"' + (ec.fromName || 'Test') + '" <' + ec.fromEmail + '>', to: recipientEmail, subject: 'Test Email from ' + siteName, html });
-      console.log('Test email sent successfully:', info.messageId);
+      log.info('Test email sent successfully:', info.messageId);
       return { success: true, messageId: info.messageId, message: 'Test email sent to ' + recipientEmail };
     } catch (error) {
-      console.error('Failed to send test email:', error);
+      log.error('Failed to send test email:', error);
       throw error;
     }
   }
@@ -339,10 +340,10 @@ class EmailService {
       const { transporter, settings } = await this.getTransporter();
       const ec = settings.emailSettings;
       const info = await transporter.sendMail({ from: '"' + (ec.fromName || 'Notification') + '" <' + ec.fromEmail + '>', to, subject, html, text });
-      console.log('Email sent successfully:', info.messageId);
+      log.info('Email sent successfully:', info.messageId);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      console.error('Failed to send email:', error);
+      log.error('Failed to send email:', error);
       throw error;
     }
   }
@@ -354,7 +355,7 @@ class EmailService {
       await transporter.verify();
       return { success: true, message: 'SMTP connection verified successfully' };
     } catch (error) {
-      console.error('SMTP verification failed:', error);
+      log.error('SMTP verification failed:', error);
       return { success: false, message: error.message };
     }
   }

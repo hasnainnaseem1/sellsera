@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('FeatureGate');
 /**
  * Feature Gate Middleware
  * 
@@ -36,7 +37,7 @@ const checkFeatureEnabled = (featureName, customMessage) => {
 
       next();
     } catch (error) {
-      console.error(`Error checking feature flag ${featureName}:`, error);
+      log.error(`Error checking feature flag ${featureName}:`, error.message);
       // On error, allow the request through (fail-open) to avoid blocking legitimate requests
       next();
     }

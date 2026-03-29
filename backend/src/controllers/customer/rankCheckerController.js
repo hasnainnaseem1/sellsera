@@ -17,6 +17,7 @@ const { EtsyListing } = require('../../models/integrations');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
+const log = require('../../utils/logger')('RankChecker');
 
 const SERP_COST_PER_REQ = 0.0025;
 const PAGES_TO_SCAN = 3; // 3 pages × 48 results = 144 positions
@@ -166,7 +167,7 @@ const checkRankings = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Rank check error:', error.message);
+    log.error('Rank check error:', error.message, error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to check rankings',
@@ -204,7 +205,7 @@ const getRankHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Rank history error:', error.message);
+    log.error('Rank history error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve rank check history',

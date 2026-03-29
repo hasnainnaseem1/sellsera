@@ -1,6 +1,7 @@
 const { Analysis } = require('../../models/customer');
 const { User } = require('../../models/user');
 const { safeSave } = require('../../utils/helpers/safeDbOps');
+const log = require('../../utils/logger')('AnalysisCtrl');
 
 /**
  * POST /api/v1/customer/analyze
@@ -166,7 +167,7 @@ ORDER NOW and get FREE gift wrapping with your purchase!`,
     });
 
   } catch (error) {
-    console.error('Analysis error:', error);
+    log.error('Analysis error:', error);
     res.status(500).json({
       success: false,
       message: 'Error analyzing listing'

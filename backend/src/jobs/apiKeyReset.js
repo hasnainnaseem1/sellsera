@@ -5,11 +5,12 @@
  * Called by the cron registry (jobs/index.js).
  */
 const { EtsyApiKey } = require('../models/integrations');
+const log = require('../utils/logger')('CronKeyReset');
 
 const run = async () => {
-  console.log('[CRON] Resetting Etsy API key daily counters...');
+  log.info('Resetting Etsy API key daily counters...');
   const result = await EtsyApiKey.resetDailyCounters();
-  console.log(`[CRON] API key counters reset — ${result.modifiedCount || 0} keys updated`);
+  log.info(`API key counters reset — ${result.modifiedCount || 0} keys updated`);
 };
 
 module.exports = { run };

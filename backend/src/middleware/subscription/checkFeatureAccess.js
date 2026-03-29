@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('FeatureAccess');
 /**
  * checkFeatureAccess Middleware Factory
  * 
@@ -152,7 +153,7 @@ const checkFeatureAccess = (featureKey) => {
 
       return next();
     } catch (error) {
-      console.error(`Feature access check error (${featureKey}):`, error);
+      log.error(`Feature access check error (${featureKey}):`, error.message);
       return res.status(500).json({
         success: false,
         message: 'Error checking feature access',

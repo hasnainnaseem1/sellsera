@@ -17,6 +17,7 @@ const { KeywordSearch } = require('../../models/customer');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
+const log = require('../../utils/logger')('TagAnalyzer');
 
 const SERP_COST_PER_REQ = 0.0025;
 
@@ -137,7 +138,7 @@ const analyzeTags = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Tag analysis error:', error.message);
+    log.error('Tag analysis error:', error.message, error.stack);
     return res.status(500).json({
       success: false,
       message: 'Failed to analyze tags',

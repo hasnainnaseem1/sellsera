@@ -15,6 +15,7 @@ const { CompetitorWatch, CompetitorSnapshot, SerpCostLog } = require('../../mode
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
+const log = require('../../utils/logger')('Competitor');
 
 const SERP_COST_PER_REQ = 0.0025;
 
@@ -157,7 +158,7 @@ const addCompetitor = async (req, res) => {
         message: 'You are already tracking this shop',
       });
     }
-    console.error('Add competitor error:', error.message);
+    log.error('Add competitor error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to add competitor',
@@ -190,7 +191,7 @@ const removeCompetitor = async (req, res) => {
       message: 'Competitor removed from watch list',
     });
   } catch (error) {
-    console.error('Remove competitor error:', error.message);
+    log.error('Remove competitor error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to remove competitor',
@@ -212,7 +213,7 @@ const getWatchList = async (req, res) => {
       data: competitors,
     });
   } catch (error) {
-    console.error('Get watch list error:', error.message);
+    log.error('Get watch list error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve competitor list',
@@ -264,7 +265,7 @@ const getSnapshotHistory = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Snapshot history error:', error.message);
+    log.error('Snapshot history error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve snapshot history',
@@ -318,7 +319,7 @@ const getSalesData = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Sales data error:', error.message);
+    log.error('Sales data error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to retrieve sales data',
@@ -428,7 +429,7 @@ const refreshCompetitor = async (req, res) => {
       data: watch,
     });
   } catch (error) {
-    console.error('Refresh competitor error:', error.message);
+    log.error('Refresh competitor error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Failed to refresh competitor data',

@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const stripeService = require('../../services/stripe/stripeService');
 const lemonSqueezyService = require('../../services/lemonsqueezy/lemonSqueezyService');
 const AdminSettings = require('../../models/admin/AdminSettings');
+const log = require('../../utils/logger')('Billing');
 const Payment = require('../../models/payment/Payment');
 const Plan = require('../../models/subscription/Plan');
 const User = require('../../models/user/User');
@@ -92,7 +93,7 @@ const createCheckout = async (req, res) => {
 
     res.json({ success: true, url: session.url, sessionId: session.id, gateway: 'stripe' });
   } catch (error) {
-    console.error('Checkout session error:', error);
+    log.error('Checkout session error:', error);
     // Stripe/LemonSqueezy not configured or auth failure → 503
     if (error.message?.includes('not configured') || error.type === 'StripeAuthenticationError') {
       return res.status(503).json({ success: false, message: 'Payment gateway is not properly configured. Contact admin.' });
@@ -132,7 +133,7 @@ const createPortal = async (req, res) => {
 
     res.json({ success: true, url: session.url, gateway: 'stripe' });
   } catch (error) {
-    console.error('Portal session error:', error);
+    log.error('Portal session error:', error);
     // Stripe/LemonSqueezy not configured or auth failure → 503
     if (error.message?.includes('not configured') || error.type === 'StripeAuthenticationError') {
       return res.status(503).json({ success: false, message: 'Payment gateway is not properly configured. Contact admin.' });
@@ -169,7 +170,7 @@ const getPayments = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get payments error:', error);
+    log.error('Get payments error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch payment history' });
   }
 };
@@ -229,7 +230,7 @@ const cancelSubscription = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Cancel subscription error:', error);
+    log.error('Cancel subscription error:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to cancel subscription' });
   }
 };
@@ -277,7 +278,7 @@ const resumeSubscription = async (req, res) => {
       gateway: 'stripe',
     });
   } catch (error) {
-    console.error('Resume subscription error:', error);
+    log.error('Resume subscription error:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to resume subscription' });
   }
 };
@@ -453,12 +454,12 @@ const verifyCheckoutSession = async (req, res) => {
       source: 'stripe',
     }).catch(() => {});
 
-    console.log(`[VerifySession] Activated: ${user.email} → ${plan.name}`);
+    log.info(`VerifySession: Activated: ${user.email} → ${plan.name}`);
 
     const fresh = await User.findById(userId).lean();
     res.json({ success: true, alreadyActivated: false, user: fresh });
   } catch (error) {
-    console.error('verifyCheckoutSession error:', error);
+    log.error('verifyCheckoutSession error:', error);
     res.status(500).json({ success: false, message: error.message || 'Verification failed' });
   }
 };
@@ -498,7 +499,7 @@ const downloadInvoice = async (req, res) => {
 
     await generateInvoicePDF(payment, user, res);
   } catch (error) {
-    console.error('downloadInvoice error:', error);
+    log.error('downloadInvoice error:', error);
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: 'Failed to generate invoice' });
     }
@@ -567,7 +568,7 @@ const downloadInvoicePublic = async (req, res) => {
 
     await generateInvoicePDF(payment, user, res);
   } catch (error) {
-    console.error('downloadInvoicePublic error:', error);
+    log.error('downloadInvoicePublic error:', error);
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: 'Failed to generate invoice' });
     }

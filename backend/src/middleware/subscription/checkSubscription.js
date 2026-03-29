@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('Subscription');
 /**
  * checkSubscription Middleware
  * 
@@ -91,7 +92,7 @@ const checkSubscription = async (req, res, next) => {
       message: 'Your subscription status is invalid. Please contact support.',
     });
   } catch (error) {
-    console.error('Subscription check error:', error);
+    log.error('Subscription check error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error checking subscription status',

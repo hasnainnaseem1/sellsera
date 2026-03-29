@@ -13,6 +13,7 @@ const { User } = require('../../models/user');
 const { AdminSettings } = require('../../models/admin');
 const { Notification } = require('../../models/notification');
 const emailService = require('../email/emailService');
+const log = require('../../utils/logger')('AdminNotifier');
 
 /**
  * Fetch current notification settings from AdminSettings singleton.
@@ -76,7 +77,7 @@ async function _notifyAdmins(admins, { type, title, message: msg, priority, meta
           text: emailText || msg,
         })
         .catch((err) =>
-          console.error(`[AdminNotifier] Email to ${admin.email} failed:`, err.message)
+          log.error(`Email to ${admin.email} failed:`, err.message)
         )
     );
     await Promise.all(emailPromises);
@@ -118,9 +119,9 @@ async function notifyNewCustomer(customer) {
       emailText: `New customer registered: ${customer.name} (${customer.email}) on ${customer.plan || 'free'} plan.`,
     }, ns);
 
-    console.log(`[AdminNotifier] Notified ${admins.length} admin(s) about new customer: ${customer.email}`);
+    log.info(`Notified ${admins.length} admin(s) about new customer: ${customer.email}`);
   } catch (err) {
-    console.error('[AdminNotifier] notifyNewCustomer error:', err.message);
+    log.error('notifyNewCustomer error:', err.message);
   }
 }
 
@@ -169,9 +170,9 @@ async function notifySubscriptionChange({ customer, oldPlan, newPlan, changeType
       emailText: `${title}: ${customer.name} (${customer.email}) — ${oldPlan} → ${newPlan} (${source})`,
     }, ns);
 
-    console.log(`[AdminNotifier] Notified ${admins.length} admin(s) about subscription ${changeType}: ${customer.email}`);
+    log.info(`Notified ${admins.length} admin(s) about subscription ${changeType}: ${customer.email}`);
   } catch (err) {
-    console.error('[AdminNotifier] notifySubscriptionChange error:', err.message);
+    log.error('notifySubscriptionChange error:', err.message);
   }
 }
 
@@ -216,9 +217,9 @@ async function notifyPasswordResetRequest({ requestUser, method = 'forgot_passwo
       emailText: msg,
     }, ns);
 
-    console.log(`[AdminNotifier] Notified ${superAdmins.length} super admin(s) about password reset request: ${requestUser.email}`);
+    log.info(`Notified ${superAdmins.length} super admin(s) about password reset request: ${requestUser.email}`);
   } catch (err) {
-    console.error('[AdminNotifier] notifyPasswordResetRequest error:', err.message);
+    log.error('notifyPasswordResetRequest error:', err.message);
   }
 }
 
@@ -258,9 +259,9 @@ async function notifyCustomerPasswordReset(customer, action = 'completed') {
       emailText: msg,
     }, ns);
 
-    console.log(`[AdminNotifier] Notified ${admins.length} admin(s) about customer password ${action}: ${customer.email}`);
+    log.info(`Notified ${admins.length} admin(s) about customer password ${action}: ${customer.email}`);
   } catch (err) {
-    console.error('[AdminNotifier] notifyCustomerPasswordReset error:', err.message);
+    log.error('notifyCustomerPasswordReset error:', err.message);
   }
 }
 
@@ -306,9 +307,9 @@ async function notifyCustomerStatusChange({ customer, oldStatus, newStatus, chan
       emailText: msg,
     }, ns);
 
-    console.log(`[AdminNotifier] Notified ${admins.length} admin(s) about customer status change: ${customer.email}`);
+    log.info(`Notified ${admins.length} admin(s) about customer status change: ${customer.email}`);
   } catch (err) {
-    console.error('[AdminNotifier] notifyCustomerStatusChange error:', err.message);
+    log.error('notifyCustomerStatusChange error:', err.message);
   }
 }
 
@@ -337,9 +338,9 @@ async function notifySystemAlert({ title, message: msg, priority = 'medium', met
       emailText: `${title}: ${msg}`,
     }, ns);
 
-    console.log(`[AdminNotifier] System alert sent to ${admins.length} admin(s): ${title}`);
+    log.info(`System alert sent to ${admins.length} admin(s): ${title}`);
   } catch (err) {
-    console.error('[AdminNotifier] notifySystemAlert error:', err.message);
+    log.error('notifySystemAlert error:', err.message);
   }
 }
 

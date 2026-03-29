@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('Marketing');
 const MarketingPage = require('../../models/admin/MarketingPage');
 const { AdminSettings } = require('../../models/admin');
 const { resolveFromReq } = require('../../utils/helpers/urlHelper');
@@ -59,7 +60,7 @@ const getSiteSettings = async (req, res) => {
       },
     }, req));
   } catch (err) {
-    console.error('Error fetching site settings:', err);
+    log.error('Error fetching site settings:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch site settings' });
   }
 };
@@ -85,7 +86,7 @@ const getNavigation = async (req, res) => {
 
     res.json({ success: true, navigation });
   } catch (err) {
-    console.error('Error fetching navigation:', err);
+    log.error('Error fetching navigation:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch navigation' });
   }
 };
@@ -102,7 +103,7 @@ const getPages = async (req, res) => {
 
     res.json({ success: true, pages });
   } catch (err) {
-    console.error('Error fetching pages:', err);
+    log.error('Error fetching pages:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch pages' });
   }
 };
@@ -133,7 +134,7 @@ const getPageBySlug = async (req, res) => {
       },
     }, req));
   } catch (err) {
-    console.error('Error fetching page:', err);
+    log.error('Error fetching page:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch page' });
   }
 };
@@ -163,7 +164,7 @@ const getHomePage = async (req, res) => {
       },
     }, req));
   } catch (err) {
-    console.error('Error fetching homepage:', err);
+    log.error('Error fetching homepage:', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch homepage' });
   }
 };

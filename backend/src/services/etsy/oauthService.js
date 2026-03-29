@@ -22,6 +22,7 @@ const crypto = require('crypto');
 const { EtsyShop } = require('../../models/integrations');
 const { encrypt } = require('../../utils/encryption');
 const AdminSettings = require('../../models/admin/AdminSettings');
+const log = require('../../utils/logger')('EtsyOAuth');
 
 const ETSY_AUTH_URL = 'https://www.etsy.com/oauth/connect';
 const ETSY_TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
@@ -142,18 +143,18 @@ const exchangeCodeForTokens = async (code, codeVerifier) => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    console.error(`[${new Date().toISOString()}] [EtsyOAuth] Token exchange failed:`, response.status, JSON.stringify(error));
+    log.error('Token exchange failed:', response.status, JSON.stringify(error));
     throw new Error(error.error_description || `Token exchange failed (HTTP ${response.status})`);
   }
 
   const tokenData = await response.json();
 
   if (!tokenData.access_token) {
-    console.error(`[${new Date().toISOString()}] [EtsyOAuth] Token response missing access_token:`, JSON.stringify(tokenData));
+    log.error('Token response missing access_token:', JSON.stringify(tokenData));
     throw new Error('Etsy returned no access token');
   }
 
-  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Token exchange success — token_type: ${tokenData.token_type}, expires_in: ${tokenData.expires_in}, has_access_token: ${!!tokenData.access_token}, has_refresh_token: ${!!tokenData.refresh_token}`);
+  log.info(`Token exchange success — token_type: ${tokenData.token_type}, expires_in: ${tokenData.expires_in}, has_access_token: ${!!tokenData.access_token}, has_refresh_token: ${!!tokenData.refresh_token}`);
 
   return {
     accessToken: tokenData.access_token,
@@ -171,7 +172,7 @@ const exchangeCodeForTokens = async (code, codeVerifier) => {
 const fetchShopInfo = async (accessToken) => {
   const config = await getEtsyConfig();
 
-  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Calling /users/me with x-api-key: ${config.clientId.substring(0, 8)}...:***`);
+  log.info(`Calling /users/me with x-api-key: ${config.clientId.substring(0, 8)}...`);
 
   // First get the Etsy user ID
   // Etsy API v3 requires x-api-key in format "keystring:sharedsecret"
@@ -185,7 +186,7 @@ const fetchShopInfo = async (accessToken) => {
 
   if (!meResponse.ok) {
     const errBody = await meResponse.text().catch(() => '');
-    console.error(`[${new Date().toISOString()}] [EtsyOAuth] /users/me failed:`, meResponse.status, errBody);
+    log.error('/users/me failed:', meResponse.status, errBody);
     throw new Error(`Failed to fetch Etsy user info (HTTP ${meResponse.status})`);
   }
 
@@ -202,13 +203,13 @@ const fetchShopInfo = async (accessToken) => {
 
   if (!shopResponse.ok) {
     const errBody = await shopResponse.text().catch(() => '');
-    console.error(`[${new Date().toISOString()}] [EtsyOAuth] /shops failed:`, shopResponse.status, errBody);
+    log.error('/shops failed:', shopResponse.status, errBody);
     throw new Error('Failed to fetch Etsy shop info. Make sure you have an active Etsy shop.');
   }
 
   const shopData = await shopResponse.json();
 
-  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Shop response keys:`, Object.keys(shopData), 'results count:', shopData.results?.length, 'shop_id:', shopData.shop_id);
+  log.info(`Shop response keys: ${Object.keys(shopData)}, results count: ${shopData.results?.length}, shop_id: ${shopData.shop_id}`);
 
   // Etsy may return the shop directly or wrapped in a results array
   let shop;
@@ -217,7 +218,7 @@ const fetchShopInfo = async (accessToken) => {
   } else if (shopData.shop_id) {
     shop = shopData;
   } else {
-    console.error(`[${new Date().toISOString()}] [EtsyOAuth] Unexpected shop response:`, JSON.stringify(shopData).substring(0, 500));
+    log.error('Unexpected shop response:', JSON.stringify(shopData).substring(0, 500));
     throw new Error('No Etsy shop found for this account');
   }
 

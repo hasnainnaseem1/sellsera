@@ -1,4 +1,5 @@
 const { Analysis } = require('../../models/customer');
+const log = require('../../utils/logger')('HistoryCtrl');
 
 /**
  * GET /api/v1/customer/history
@@ -35,7 +36,7 @@ const getHistory = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get history error:', error);
+    log.error('Get history error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching analysis history'
@@ -76,7 +77,7 @@ const getAnalysisById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get analysis error:', error);
+    log.error('Get analysis error:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching analysis'
@@ -108,7 +109,7 @@ const deleteAnalysis = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete analysis error:', error);
+    log.error('Delete analysis error:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting analysis'
@@ -131,7 +132,7 @@ const deleteAllAnalyses = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete all analyses error:', error);
+    log.error('Delete all analyses error:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting analyses'

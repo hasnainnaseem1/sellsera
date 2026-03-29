@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('ShopConnection');
 /**
  * checkShopConnection Middleware
  * 
@@ -99,7 +100,7 @@ const checkShopConnection = async (req, res, next) => {
     return next();
 
   } catch (error) {
-    console.error('checkShopConnection error:', error.message);
+    log.error('checkShopConnection error:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error checking shop connection',

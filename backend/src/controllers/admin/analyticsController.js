@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('Analytics');
 const { User } = require('../../models/user');
 const { ActivityLog } = require('../../models/admin');
 const { Analysis } = require('../../models/customer');
@@ -140,7 +141,7 @@ async function getOverview(req, res) {
       },
     });
   } catch (error) {
-    console.error('Get analytics overview error:', error);
+    log.error('Get analytics overview error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching analytics' });
   }
 }
@@ -187,7 +188,7 @@ async function getUsersGrowth(req, res) {
 
     res.json({ success: true, period, data: growthData });
   } catch (error) {
-    console.error('Get user growth error:', error);
+    log.error('Get user growth error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching user growth data' });
   }
 }
@@ -233,7 +234,7 @@ async function getAnalysesTrend(req, res) {
 
     res.json({ success: true, period, data: trendData });
   } catch (error) {
-    console.error('Get analyses trend error:', error);
+    log.error('Get analyses trend error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching analyses trend data' });
   }
 }
@@ -275,7 +276,7 @@ async function getSubscriptionDistribution(req, res) {
     });
 
   } catch (error) {
-    console.error('Get subscription distribution error:', error);
+    log.error('Get subscription distribution error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Error fetching subscription distribution'
@@ -344,7 +345,7 @@ async function getTopCustomers(req, res) {
     });
 
   } catch (error) {
-    console.error('Get top customers error:', error);
+    log.error('Get top customers error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Error fetching top customers'
@@ -370,7 +371,7 @@ async function getRecentActivities(req, res) {
     });
 
   } catch (error) {
-    console.error('Get recent activities error:', error);
+    log.error('Get recent activities error:', error.message);
     res.status(500).json({
       success: false,
       message: 'Error fetching recent activities'
@@ -424,7 +425,7 @@ async function getPlanDistribution(req, res) {
       totalMonthlyRevenue: totalRevenue,
     });
   } catch (error) {
-    console.error('Get plan distribution error:', error);
+    log.error('Get plan distribution error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching plan distribution' });
   }
 }
@@ -442,7 +443,7 @@ async function getUsageStats(req, res) {
 
     res.json({ success: true, period, usageStats, totalUsageEvents });
   } catch (error) {
-    console.error('Get usage stats error:', error);
+    log.error('Get usage stats error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching usage stats' });
   }
 }
@@ -463,7 +464,7 @@ async function getUsageTrend(req, res) {
       trend,
     });
   } catch (error) {
-    console.error('Get usage trend error:', error);
+    log.error('Get usage trend error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching usage trend' });
   }
 }
@@ -478,7 +479,7 @@ async function getCustomerUsage(req, res) {
     const usageSummary = await UsageLog.getCustomerUsageSummary(req.params.id, startDate, new Date());
     res.json({ success: true, customerId: req.params.id, period, usageSummary });
   } catch (error) {
-    console.error('Get customer usage error:', error);
+    log.error('Get customer usage error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching customer usage' });
   }
 }
@@ -619,7 +620,7 @@ async function getRevenueStats(req, res) {
       },
     });
   } catch (error) {
-    console.error('Get revenue stats error:', error);
+    log.error('Get revenue stats error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching revenue stats' });
   }
 }
@@ -675,7 +676,7 @@ async function getLoginAnalytics(req, res) {
       },
     });
   } catch (error) {
-    console.error('Get login analytics error:', error);
+    log.error('Get login analytics error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching login analytics' });
   }
 }
@@ -728,7 +729,7 @@ async function getFeatureAdoption(req, res) {
       features: adoptionWithRate,
     });
   } catch (error) {
-    console.error('Get feature adoption error:', error);
+    log.error('Get feature adoption error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching feature adoption' });
   }
 }
@@ -790,7 +791,7 @@ async function getPerPlanUsage(req, res) {
       perPlanUsage: byPlan,
     });
   } catch (error) {
-    console.error('Get per-plan usage error:', error);
+    log.error('Get per-plan usage error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching per-plan usage' });
   }
 }
@@ -1010,7 +1011,7 @@ async function getRevenueAdvanced(req, res) {
       },
     });
   } catch (error) {
-    console.error('Get advanced revenue stats error:', error);
+    log.error('Get advanced revenue stats error:', error.message);
     res.status(500).json({ success: false, message: 'Error fetching advanced revenue stats' });
   }
 }
