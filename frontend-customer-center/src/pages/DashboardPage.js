@@ -125,20 +125,51 @@ const DashboardPage = () => {
     });
   };
 
-  // Manual sync handler for a specific shop
+  // Manual sync handler for a specific shop (with background job polling)
   const handleSync = async (shop) => {
     setSyncingShop(shop.id);
     try {
       const res = await etsyApi.syncShop(shop.id);
-      if (res.success) {
+      if (res.success && res.data?.jobId) {
+        message.loading({ content: `Syncing "${shop.shopName}"...`, key: 'sync', duration: 0 });
+        // Poll for completion
+        const jobId = res.data.jobId;
+        const poll = setInterval(async () => {
+          try {
+            const status = await etsyApi.getSyncStatus(jobId);
+            if (status.data?.status === 'completed') {
+              clearInterval(poll);
+              const count = status.data?.result?.syncedCount || 0;
+              message.success({ content: `"${shop.shopName}" synced — ${count} listings updated!`, key: 'sync' });
+              setSyncingShop(null);
+              refreshShops();
+            } else if (status.data?.status === 'failed') {
+              clearInterval(poll);
+              message.error({ content: status.data?.error || 'Sync failed', key: 'sync' });
+              setSyncingShop(null);
+            }
+          } catch {
+            clearInterval(poll);
+            setSyncingShop(null);
+          }
+        }, 3000);
+        // Safety timeout — stop polling after 5 minutes
+        setTimeout(() => { clearInterval(poll); setSyncingShop(null); }, 300000);
+      } else if (res.success) {
         message.success(res.message || `"${shop.shopName}" synced!`);
-        refreshShops(); // refresh shop list with updated counts
+        refreshShops();
+        setSyncingShop(null);
       } else {
         message.error(res.message || 'Sync failed');
+        setSyncingShop(null);
       }
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to sync listings');
-    } finally {
+      // If shop is already syncing, show status instead of error
+      if (err?.response?.status === 409) {
+        message.info(err.response.data.message || 'Shop is already syncing');
+      } else {
+        message.error(err?.response?.data?.message || 'Failed to sync listings');
+      }
       setSyncingShop(null);
     }
   };

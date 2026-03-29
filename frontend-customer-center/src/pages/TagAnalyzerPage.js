@@ -50,13 +50,18 @@ const TagAnalyzerPage = () => {
     setLoading(true);
     try {
       const res = await etsyApi.analyzeTags({ tags: tagList });
+      if (res.success === false) {
+        message.error(res.message || 'Unable to analyze tags');
+        setResults([]);
+        return;
+      }
       const rows = (res.data?.tags || res.tags || []).map((t, i) => {
-        const score = t.score || t.qualityScore || 0;
+        const score = t.score || t.overallScore || t.qualityScore || 0;
         return {
           key: i,
           tag: t.tag || t.name || tagList[i] || '',
           score,
-          volume: t.volume || 0,
+          volume: t.volume || t.totalResults || 0,
           competition: t.competition || 0,
           status: score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'fair' : 'poor',
         };

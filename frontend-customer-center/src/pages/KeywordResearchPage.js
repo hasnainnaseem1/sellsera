@@ -56,19 +56,24 @@ const KeywordResearchPage = () => {
     setSearched(true);
     try {
       const res = await etsyApi.searchKeywords({ keyword: keyword.trim(), country });
+      if (res.success === false) {
+        message.error(res.message || 'Unable to fetch keyword data');
+        setResults([]);
+        return;
+      }
       const rows = (res.data?.results || res.results || []).map((k, i) => ({
         key: i,
         keyword: k.keyword || k.query || keyword.trim(),
-        searches: k.searches || k.volume || 0,
+        searches: k.searches || k.volume || k.estimatedVolume || 0,
         clicks: k.clicks || 0,
         ctr: k.ctr || '—',
-        competition: k.competition || 0,
+        competition: k.competition || k.competitionPct || 0,
         trend: k.trend || 'stable',
       }));
       setResults(rows);
-      if (!rows.length) message.info('No keyword data found');
+      if (!rows.length) message.info('No results found for this keyword. Try a different search term.');
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Search failed — is your Etsy shop connected?';
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Search failed — check your connection';
       message.error(msg);
       setResults([]);
     } finally {

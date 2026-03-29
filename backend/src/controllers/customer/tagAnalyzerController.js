@@ -34,12 +34,8 @@ const analyzeTags = async (req, res) => {
       });
     }
 
-    if (!title || typeof title !== 'string') {
-      return res.status(400).json({
-        success: false,
-        message: 'Listing title is required for relevance scoring',
-      });
-    }
+    // Title is optional — use empty string if not provided
+    const listingTitle = (title && typeof title === 'string') ? title : '';
 
     const tagList = tags
       .map(t => (typeof t === 'string' ? t.trim() : ''))
@@ -72,25 +68,35 @@ const analyzeTags = async (req, res) => {
         await redis.set(cacheKey, tagData, 21600);
       }
 
-      // Quality score
-      const qualityScore = scoreTag(tag, title, category);
+      // Quality score — title is optional, scoring adjusts when absent
+      const qualityScore = scoreTag(tag, listingTitle, category);
 
       // Overall score = quality weighted with competition inverse
       const competitionPenalty = tagData.competitionLevel === 'high' ? 0.7
         : tagData.competitionLevel === 'medium' ? 0.85 : 1.0;
       const overallScore = Math.round(qualityScore.score * competitionPenalty);
 
+      // Convert competition level string to numeric (0-100) for frontend
+      const competitionNumeric = tagData.totalResults > 100000 ? 85
+        : tagData.totalResults > 50000 ? 70
+        : tagData.totalResults > 10000 ? 50
+        : tagData.totalResults > 1000 ? 30
+        : 15;
+
       const status = overallScore >= 80 ? 'excellent' : overallScore >= 60 ? 'good' : 'needs_work';
 
       results.push({
         tag,
+        score: overallScore,
         qualityScore: qualityScore.score,
         overallScore,
+        volume: tagData.totalResults,
+        competition: competitionNumeric,
         status,
-        competition: tagData.competitionLevel,
+        competitionLevel: tagData.competitionLevel,
         totalResults: tagData.totalResults,
         details: qualityScore.details,
-        suggestion: status === 'needs_work' ? generateSuggestion(tag, title) : null,
+        suggestion: status === 'needs_work' ? generateSuggestion(tag, listingTitle) : null,
       });
     }
 
@@ -126,7 +132,7 @@ const analyzeTags = async (req, res) => {
           missingTags: Math.max(0, 13 - tagList.length),
         },
         suggestedReplacements: needsWork > 0
-          ? await getReplacementSuggestions(req.userId, tagList, title)
+          ? await getReplacementSuggestions(req.userId, tagList, listingTitle)
           : [],
       },
     });

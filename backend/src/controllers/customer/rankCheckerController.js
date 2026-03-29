@@ -5,31 +5,30 @@
  * GET  /api/v1/customer/rank-checker/history  → Get rank check history
  * 
  * Feature key: bulk_rank_check
+ * 
+ * Two modes:
+ * 1. With etsyListingId — scan Etsy search results to find where the listing ranks
+ * 2. Without etsyListingId — auto-detect from user's connected shop listings
  */
 
 const { RankCheck } = require('../../models/customer');
 const { SerpCostLog } = require('../../models/customer');
+const { EtsyListing } = require('../../models/integrations');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
 
 const SERP_COST_PER_REQ = 0.0025;
-const PAGES_TO_SCAN = 5; // 5 pages × 48 results = 240 results max
+const PAGES_TO_SCAN = 3; // 3 pages × 48 results = 144 positions
 
 /**
  * POST /api/v1/customer/rank-checker
- * Check where a listing ranks for given keywords.
+ * Check keyword rankings. If etsyListingId is provided, finds exact rank.
+ * Otherwise, searches user's connected shop for all listings and checks them.
  */
 const checkRankings = async (req, res) => {
   try {
-    const { etsyListingId, keywords, listingTitle } = req.body;
-
-    if (!etsyListingId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Etsy listing ID is required',
-      });
-    }
+    let { etsyListingId, keywords, listingTitle } = req.body;
 
     if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return res.status(400).json({
@@ -38,26 +37,53 @@ const checkRankings = async (req, res) => {
       });
     }
 
-    // Limit to 50 keywords per request
     const keywordList = keywords
       .map(k => (typeof k === 'string' ? k.trim() : ''))
       .filter(k => k.length > 0)
       .slice(0, 50);
 
-    const targetListingId = String(etsyListingId);
+    // If no specific listing, get all user's listings for matching
+    let shopListingIds = [];
+    if (!etsyListingId && req.etsyShop) {
+      const userListings = await EtsyListing.find(
+        { shopId: req.etsyShop.shopId },
+        { etsyListingId: 1 }
+      ).limit(200).lean();
+      shopListingIds = userListings.map(l => String(l.etsyListingId));
+    }
+
+    const targetListingId = etsyListingId ? String(etsyListingId) : null;
     const results = [];
     let totalSerpCalls = 0;
 
+    // Check for previous rank data (for change calculation)
+    const previousCheck = await RankCheck.findOne({ userId: req.userId })
+      .sort({ checkedAt: -1 })
+      .select('results')
+      .lean();
+    const previousRanks = new Map();
+    if (previousCheck) {
+      for (const r of (previousCheck.results || [])) {
+        if (r.keyword && r.rank != null) {
+          previousRanks.set(r.keyword.toLowerCase(), r.rank);
+        }
+      }
+    }
+
     for (const keyword of keywordList) {
-      const cacheKey = `rank:${targetListingId}:${hashKey(keyword)}`;
+      const cacheKey = `rank:${targetListingId || 'shop'}:${hashKey(keyword)}`;
       let rankData = await redis.get(cacheKey);
 
       if (rankData) {
+        // Add change/trend from previous
+        const prevRank = previousRanks.get(keyword.toLowerCase());
+        rankData.change = prevRank != null && rankData.rank != null ? prevRank - rankData.rank : 0;
+        rankData.trend = rankData.change > 0 ? 'up' : rankData.change < 0 ? 'down' : 'stable';
         results.push(rankData);
         continue;
       }
 
-      // Scan up to 5 pages for the listing
+      // Scan search results
       let found = false;
       let rank = null;
       let page = null;
@@ -78,27 +104,34 @@ const checkRankings = async (req, res) => {
         }
 
         const listings = searchResult.data.results || [];
-        const idx = listings.findIndex(l => String(l.listing_id) === targetListingId);
 
-        if (idx !== -1) {
-          rank = (p * 48) + idx + 1;
-          page = p + 1;
-          found = true;
+        // Try to find a specific listing or any of user's listings
+        for (let idx = 0; idx < listings.length; idx++) {
+          const lid = String(listings[idx].listing_id);
+          if (targetListingId ? lid === targetListingId : shopListingIds.includes(lid)) {
+            rank = (p * 48) + idx + 1;
+            page = p + 1;
+            found = true;
+            break;
+          }
         }
 
-        // Don't scan more pages if we've exceeded total results
         if ((p + 1) * 48 >= totalResults) break;
       }
+
+      const prevRank = previousRanks.get(keyword.toLowerCase());
+      const change = prevRank != null && rank != null ? prevRank - rank : 0;
 
       rankData = {
         keyword,
         rank: found ? rank : null,
-        page: found ? page : null,
-        totalResults,
+        page: found ? page : Math.ceil(((rank || totalResults) + 1) / 48),
+        volume: totalResults,
         found,
+        change,
+        trend: change > 0 ? 'up' : change < 0 ? 'down' : 'stable',
       };
 
-      // Cache for 6 hours
       await redis.set(cacheKey, rankData, 21600);
       results.push(rankData);
     }
@@ -106,19 +139,18 @@ const checkRankings = async (req, res) => {
     // Save to DB
     const rankCheck = await RankCheck.create({
       userId: req.userId,
-      etsyListingId: targetListingId,
+      etsyListingId: targetListingId || 'shop',
       listingTitle: listingTitle || '',
       results,
       keywordCount: keywordList.length,
       serpCallCount: totalSerpCalls,
     });
 
-    // Log SERP cost
     if (totalSerpCalls > 0) {
       await SerpCostLog.create({
         userId: req.userId,
         featureKey: 'bulk_rank_check',
-        action: `rank_check:${targetListingId}`,
+        action: `rank_check:${targetListingId || 'shop'}`,
         requestCount: totalSerpCalls,
         costUsd: totalSerpCalls * SERP_COST_PER_REQ,
         cacheHit: false,
@@ -129,7 +161,6 @@ const checkRankings = async (req, res) => {
       success: true,
       data: {
         checkId: rankCheck._id,
-        etsyListingId: targetListingId,
         results,
         totalSerpCalls,
       },

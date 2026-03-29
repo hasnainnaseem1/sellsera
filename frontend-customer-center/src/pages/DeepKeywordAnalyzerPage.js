@@ -49,6 +49,11 @@ const DeepKeywordAnalyzerPage = () => {
     setLoading(true);
     try {
       const res = await etsyApi.deepAnalysis({ keyword: keyword.trim() });
+      if (res.success === false) {
+        message.error(res.message || 'Unable to fetch keyword data');
+        setResult(null);
+        return;
+      }
       const d = res.data || res;
       setResult({
         keyword: keyword.trim(),

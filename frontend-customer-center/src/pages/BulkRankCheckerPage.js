@@ -42,12 +42,17 @@ const BulkRankCheckerPage = () => {
     setLoading(true);
     try {
       const res = await etsyApi.checkRankings({ keywords: kws });
+      if (res.success === false) {
+        message.error(res.message || 'Unable to check rankings');
+        setResults([]);
+        return;
+      }
       const rows = (res.data?.results || res.results || []).map((r, i) => ({
         key: i,
         keyword: r.keyword || kws[i] || '',
         rank: r.rank || r.position || 0,
-        page: r.page || Math.ceil((r.rank || 1) / 48),
-        volume: r.volume || 0,
+        page: r.page || (r.rank ? Math.ceil(r.rank / 48) : 0),
+        volume: r.volume || r.totalResults || 0,
         change: r.change || 0,
         trend: r.trend || 'stable',
       }));
