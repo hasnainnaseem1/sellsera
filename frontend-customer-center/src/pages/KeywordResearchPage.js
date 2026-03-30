@@ -45,6 +45,8 @@ const KeywordResearchPage = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     etsyApi.getCountries()
@@ -64,6 +66,7 @@ const KeywordResearchPage = () => {
     if (!keyword.trim()) { message.warning('Enter a keyword to search'); return; }
     setLoading(true);
     setSearched(true);
+    setCurrentPage(1);
     try {
       const res = await etsyApi.searchKeywords({ keyword: keyword.trim(), country });
       if (res.success === false) {
@@ -233,8 +236,24 @@ const KeywordResearchPage = () => {
                 columns={columns}
                 dataSource={results}
                 loading={loading}
-                pagination={false}
                 size="middle"
+                pagination={{
+                  current: currentPage,
+                  pageSize,
+                  total: results.length,
+                  onChange: (page, size) => {
+                    setCurrentPage(page);
+                    setPageSize(size);
+                  },
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                  showTotal: (total, range) => (
+                    <Text type="secondary" style={{ fontSize: 13 }}>
+                      Showing {range[0]}–{range[1]} of {total} keywords
+                    </Text>
+                  ),
+                  style: { marginTop: 16 },
+                }}
               />
             </>
           ) : (
