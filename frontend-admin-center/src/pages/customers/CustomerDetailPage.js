@@ -165,10 +165,14 @@ const CustomerDetailPage = () => {
 
   const handleResetUsage = async () => {
     try {
-      await customersApi.resetUsage(id);
-      message.success('Usage reset successfully');
-      fetchCustomer();
-      fetchUsageAnalytics();
+      const data = await customersApi.resetUsage(id);
+      message.success(`Usage reset successfully (${data.deletedRecords || 0} records cleared)`);
+      // Immediately reflect zeroed-out usage from response
+      if (data.updatedUsage) {
+        setFeatureUsage(data.updatedUsage);
+      }
+      // Re-fetch full data for consistency
+      await Promise.all([fetchCustomer(), fetchUsageAnalytics()]);
     } catch (err) {
       message.error(err.response?.data?.message || 'Failed to reset usage');
     }

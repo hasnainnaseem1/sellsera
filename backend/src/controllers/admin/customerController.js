@@ -889,10 +889,11 @@ const updateCustomerPlan = async (req, res) => {
 };
 
 // @route   POST /api/admin/customers/:id/reset-usage
-// @desc    Reset customer's monthly analysis count
+// @desc    Reset ALL feature usage counters for a customer
 const resetCustomerUsage = async (req, res) => {
   try {
     const clientIP = getClientIP(req);
+    const { UsageLog } = require('../../models/subscription');
 
     const customer = await User.findOne({
       _id: req.params.id,
@@ -906,7 +907,31 @@ const resetCustomerUsage = async (req, res) => {
       });
     }
 
-    await customer.resetMonthlyCount();
+    // Delete all 'used' UsageLog records for this customer (resets per-feature counters)
+    const deleteResult = await UsageLog.deleteMany({
+      userId: customer._id,
+      action: 'used'
+    });
+
+    // Reset legacy analysis count and save
+    customer.analysisCount = 0;
+    await customer.save();
+
+    // Log the reset in UsageLog for audit trail
+    await UsageLog.logUsage({
+      userId: customer._id,
+      featureKey: '_admin_reset',
+      planId: customer.currentPlan,
+      planName: customer.planSnapshot?.planName || '',
+      action: 'reset',
+      currentCount: 0,
+      limit: null,
+      metadata: {
+        resetBy: req.userId,
+        resetByEmail: req.user.email,
+        deletedRecords: deleteResult.deletedCount
+      },
+    });
 
     // Log activity
     await safeActivityLog(ActivityLog, {
@@ -919,7 +944,7 @@ const resetCustomerUsage = async (req, res) => {
       targetModel: 'User',
       targetId: customer._id,
       targetName: customer.name,
-      description: `Reset usage counts for customer: ${customer.email}`,
+      description: `Reset usage counts for customer: ${customer.email} (${deleteResult.deletedCount} records cleared)`,
       ipAddress: clientIP,
       userAgent: req.get('user-agent'),
       status: 'success'
@@ -934,15 +959,30 @@ const resetCustomerUsage = async (req, res) => {
       priority: 'medium'
     });
 
+    // Build zeroed-out feature usage from plan snapshot
+    const planFeatures = customer.planSnapshot?.features || [];
+    const updatedUsage = planFeatures
+      .filter(f => f.enabled)
+      .map(f => ({
+        featureKey: f.featureKey,
+        featureName: f.featureName,
+        limit: f.limit,
+        used: 0,
+        remaining: f.limit !== null && f.limit !== undefined ? f.limit : null,
+        percentage: 0,
+      }));
+
     res.json({
       success: true,
       message: 'Customer usage reset successfully',
+      deletedRecords: deleteResult.deletedCount,
       customer: {
         id: customer._id,
         analysisCount: customer.analysisCount,
         analysisLimit: customer.analysisLimit,
         monthlyResetDate: customer.monthlyResetDate
-      }
+      },
+      updatedUsage,
     });
 
   } catch (error) {
