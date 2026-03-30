@@ -31,7 +31,7 @@ const statusConfig = {
 const TagAnalyzerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, refresh } = usePermissions();
+  const { getFeatureAccess, incrementUsage, refresh } = usePermissions();
   getFeatureAccess('tag_analysis');
 
   const [tags, setTags] = useState('');
@@ -67,6 +67,7 @@ const TagAnalyzerPage = () => {
         };
       });
       setResults(rows);
+      if (rows.length) incrementUsage('tag_analysis');
       if (!rows.length) message.info('No tag analysis data found');
     } catch (err) {
       message.error(err?.response?.data?.message || 'Tag analysis failed');

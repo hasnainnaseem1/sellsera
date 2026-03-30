@@ -31,7 +31,7 @@ const trendIcon = (t) => {
 const DeepKeywordAnalyzerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, refresh } = usePermissions();
+  const { getFeatureAccess, incrementUsage, refresh } = usePermissions();
   getFeatureAccess('keyword_deep_analysis');
 
   const [keyword, setKeyword] = useState('');
@@ -69,6 +69,7 @@ const DeepKeywordAnalyzerPage = () => {
         relatedKeywords: d.relatedKeywords || [],
         suggestedTags: d.suggestedTags || [],
       });
+      incrementUsage('keyword_deep_analysis');
     } catch (err) {
       message.error(err?.response?.data?.message || 'Deep analysis failed');
       setResult(null);

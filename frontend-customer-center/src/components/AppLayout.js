@@ -40,6 +40,9 @@ const AppLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [cmdBarOpen, setCmdBarOpen] = useState(false);
   const [needsReauth, setNeedsReauth] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () => sessionStorage.getItem('etsyBannerDismissed') === 'true'
+  );
 
   // Check if Etsy shop needs re-authorization
   useEffect(() => {
@@ -403,18 +406,33 @@ const AppLayout = ({ children }) => {
           minHeight: 'calc(100vh - 112px)',
         }}>
           {/* Etsy Required Trademark Disclosure — rendered once at app level */}
-          <div style={{
-            textAlign: 'center',
-            padding: '10px 16px',
-            marginBottom: 16,
-            borderRadius: 8,
-            background: isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.05)',
-            border: `1px solid ${isDark ? 'rgba(108,99,255,0.2)' : 'rgba(108,99,255,0.15)'}`,
-          }}>
-            <Text style={{ fontSize: 13, color: isDark ? '#a0a0c0' : '#666' }}>
-              The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
-            </Text>
-          </div>
+          {!bannerDismissed && (
+            <div style={{
+              textAlign: 'center',
+              padding: '10px 16px',
+              marginBottom: 16,
+              borderRadius: 8,
+              background: isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.05)',
+              border: `1px solid ${isDark ? 'rgba(108,99,255,0.2)' : 'rgba(108,99,255,0.15)'}`,
+              position: 'relative',
+            }}>
+              <Text style={{ fontSize: 13, color: isDark ? '#a0a0c0' : '#666' }}>
+                The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
+              </Text>
+              <span
+                onClick={() => { setBannerDismissed(true); sessionStorage.setItem('etsyBannerDismissed', 'true'); }}
+                style={{
+                  position: 'absolute', top: 6, right: 10,
+                  cursor: 'pointer', fontSize: 16, lineHeight: 1,
+                  color: isDark ? '#a0a0c0' : '#999',
+                }}
+                role="button"
+                aria-label="Close disclaimer"
+              >
+                &times;
+              </span>
+            </div>
+          )}
           {needsReauth && (
             <Alert
               type="warning"
@@ -456,11 +474,11 @@ const AppLayout = ({ children }) => {
           borderTop: `1px solid ${isDark ? '#2e2e4a' : '#f0f0f5'}`,
         }}>
           <div style={{ marginBottom: 4 }}>
-            <a href={siteConfig?.marketingUrl ? `${siteConfig.marketingUrl}/privacy` : '/privacy'}
-              target="_blank" rel="noreferrer"
+            <a href="https://sellsera.com/privacy"
+              target="_blank" rel="noopener noreferrer"
               style={{ color: isDark ? '#8888a8' : '#888', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Privacy Policy</a>
-            <a href={siteConfig?.marketingUrl ? `${siteConfig.marketingUrl}/terms` : '/terms'}
-              target="_blank" rel="noreferrer"
+            <a href="https://sellsera.com/terms"
+              target="_blank" rel="noopener noreferrer"
               style={{ color: isDark ? '#8888a8' : '#888', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Terms of Service</a>
             {siteConfig?.contactEmail && (
               <a href={`mailto:${siteConfig.contactEmail}`}

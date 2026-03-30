@@ -23,7 +23,7 @@ const BRAND = '#6C63FF';
 const CompetitorSalesPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, refresh } = usePermissions();
+  const { getFeatureAccess, incrementUsage, refresh } = usePermissions();
   getFeatureAccess('competitor_sales');
 
   const [data, setData] = useState([]);
@@ -75,6 +75,7 @@ const CompetitorSalesPage = () => {
     try {
       const shopName = shopUrl.trim().replace('https://www.etsy.com/shop/', '').replace(/\//g, '');
       await etsyApi.addCompetitor({ shopName });
+      incrementUsage('competitor_sales');
       setShopUrl('');
       message.success('Shop added to sales tracking');
       fetchData();

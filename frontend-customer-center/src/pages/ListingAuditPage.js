@@ -39,7 +39,7 @@ const ListingAuditPage = () => {
 
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, refresh } = usePermissions();
+  const { getFeatureAccess, incrementUsage, refresh } = usePermissions();
   const access = getFeatureAccess('listing_audit');
 
   const [loading, setLoading] = useState(false);
@@ -62,6 +62,7 @@ const ListingAuditPage = () => {
         category: values.category,
       });
       setResult(data);
+      incrementUsage('listing_audit');
       refresh(); // refresh usage counts
       message.success('Analysis complete!');
     } catch (err) {

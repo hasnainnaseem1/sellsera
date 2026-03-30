@@ -21,7 +21,7 @@ const { Title, Text } = Typography;
 const CompetitorTrackerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess } = usePermissions();
+  const { getFeatureAccess, incrementUsage } = usePermissions();
   const access = getFeatureAccess('competitor_tracking');
 
   const [shopUrl, setShopUrl] = useState('');
@@ -66,6 +66,7 @@ const CompetitorTrackerPage = () => {
     try {
       const shopName = shopUrl.trim().replace('https://www.etsy.com/shop/', '').replace(/\//g, '');
       await etsyApi.addCompetitor({ shopName });
+      incrementUsage('competitor_tracking');
       message.success(`Now tracking ${shopName}`);
       setShopUrl('');
       fetchWatchList();

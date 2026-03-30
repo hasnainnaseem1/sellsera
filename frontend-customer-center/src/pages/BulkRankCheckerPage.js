@@ -23,7 +23,7 @@ const BRAND = '#6C63FF';
 const BulkRankCheckerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, refresh } = usePermissions();
+  const { getFeatureAccess, incrementUsage, refresh } = usePermissions();
   getFeatureAccess('bulk_rank_check');
 
   const [keywords, setKeywords] = useState('');
@@ -57,6 +57,7 @@ const BulkRankCheckerPage = () => {
         trend: r.trend || 'stable',
       }));
       setResults(rows);
+      if (rows.length) incrementUsage('bulk_rank_check');
       if (!rows.length) message.info('No ranking data found');
     } catch (err) {
       message.error(err?.response?.data?.message || 'Rank check failed');

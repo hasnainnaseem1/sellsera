@@ -36,7 +36,7 @@ const compColor = (comp) => {
 const KeywordResearchPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess } = usePermissions();
+  const { getFeatureAccess, incrementUsage } = usePermissions();
   const access = getFeatureAccess('keyword_search');
 
   const [keyword, setKeyword] = useState('');
@@ -84,6 +84,7 @@ const KeywordResearchPage = () => {
         trend: k.trend || 'stable',
       }));
       setResults(rows);
+      if (rows.length) incrementUsage('keyword_search');
       if (!rows.length) message.info('No results found for this keyword. Try a different search term.');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Search failed — check your connection';

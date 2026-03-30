@@ -96,6 +96,25 @@ export const PermissionsProvider = ({ children }) => {
     return (f.used / f.limit) >= 0.8;
   });
 
+  /**
+   * Optimistically increment the usage counter for a feature.
+   * Updates the UI instantly without waiting for a server round-trip.
+   */
+  const incrementUsage = useCallback((featureKey) => {
+    setFeatures(prev => {
+      const f = prev[featureKey];
+      if (!f) return prev;
+      return {
+        ...prev,
+        [featureKey]: {
+          ...f,
+          used: (f.used || 0) + 1,
+          remaining: f.unlimited ? f.remaining : Math.max(0, (f.remaining ?? f.limit) - 1),
+        },
+      };
+    });
+  }, []);
+
   return (
     <PermissionsContext.Provider value={{
       features,
@@ -103,6 +122,7 @@ export const PermissionsProvider = ({ children }) => {
       loading,
       getFeatureAccess,
       hasQuotaWarning,
+      incrementUsage,
       refresh: fetchPermissions,
     }}>
       {children}
