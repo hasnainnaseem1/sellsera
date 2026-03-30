@@ -205,7 +205,8 @@ const KeywordResearchPage = () => {
               <Select
                 value={country}
                 onChange={(val) => {
-                  const c = countries.find(ct => ct.value === val);
+                  const allItems = countries;
+                  const c = allItems.find(ct => ct.value === val);
                   if (c?.isLocked) {
                     setLockedCountry(c);
                     setUpgradeOpen(true);
@@ -213,11 +214,28 @@ const KeywordResearchPage = () => {
                   }
                   setCountry(val);
                 }}
-                options={countries.map(c => ({
-                  value: c.value,
-                  label: c.label,
-                  disabled: false, // keep selectable to intercept click
-                }))}
+                options={(() => {
+                  const pinned = ['Global', 'US'];
+                  const unlocked = countries.filter(c => !c.isLocked);
+                  const locked = countries.filter(c => c.isLocked);
+                  // Pin Global & US at top, then the rest alphabetically
+                  const pinnedItems = unlocked.filter(c => pinned.includes(c.value));
+                  const otherUnlocked = unlocked.filter(c => !pinned.includes(c.value));
+                  const groups = [];
+                  if (pinnedItems.length || otherUnlocked.length) {
+                    groups.push({
+                      label: <span style={{ fontSize: 11, fontWeight: 700, color: colors.brand, textTransform: 'uppercase', letterSpacing: 0.5 }}>Available in Your Plan</span>,
+                      options: [...pinnedItems, ...otherUnlocked].map(c => ({ value: c.value, label: c.label })),
+                    });
+                  }
+                  if (locked.length) {
+                    groups.push({
+                      label: <span style={{ fontSize: 11, fontWeight: 700, color: isDark ? '#6B7280' : '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>Premium Markets</span>,
+                      options: locked.map(c => ({ value: c.value, label: c.label })),
+                    });
+                  }
+                  return groups;
+                })()}
                 size="large"
                 style={{ width: '100%' }}
                 prefix={<GlobalOutlined />}
@@ -229,13 +247,12 @@ const KeywordResearchPage = () => {
                   return (
                     <div style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      opacity: locked ? 0.55 : 1,
                     }}>
-                      <span style={{ color: locked ? tok.colorTextDisabled : undefined }}>
+                      <span style={{ color: locked ? (isDark ? '#6B7280' : '#9CA3AF') : undefined }}>
                         {option.label}
                       </span>
                       {locked && (
-                        <LockOutlined style={{ fontSize: 12, color: colors.muted, marginLeft: 8 }} />
+                        <LockOutlined style={{ fontSize: 12, color: isDark ? '#6B7280' : '#9CA3AF', marginLeft: 8 }} />
                       )}
                     </div>
                   );
