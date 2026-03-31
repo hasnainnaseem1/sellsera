@@ -11,6 +11,7 @@ const usageReset = require('./usageReset');
 const shopSync = require('./shopSync');
 const competitorSync = require('./competitorSync');
 const apiKeyReset = require('./apiKeyReset');
+const keywordSnapshot = require('./keywordSnapshot');
 const log = require('../utils/logger')('Cron');
 
 /* ─── Built-in system jobs ─── */
@@ -93,6 +94,19 @@ const systemJobs = {
     runCount: 0,
     task: null,
   },
+  keywordSnapshot: {
+    name: 'Daily Keyword Snapshot',
+    description: 'Snapshots top 500 keywords from search history for trend tracking',
+    schedule: '0 2 * * *',
+    scheduleLabel: 'Daily at 2:00 AM',
+    system: true,
+    enabled: true,
+    lastRun: null,
+    lastStatus: null,
+    lastError: null,
+    runCount: 0,
+    task: null,
+  },
 };
 
 const systemRunners = {
@@ -102,6 +116,7 @@ const systemRunners = {
   shopSync: shopSync.run,
   competitorSync: competitorSync.run,
   apiKeyReset: apiKeyReset.run,
+  keywordSnapshot: keywordSnapshot.run,
 };
 
 /* ─── Custom jobs (loaded from DB at init, keyed by DB _id) ─── */

@@ -8,6 +8,7 @@ const CompetitorWatch = require('./CompetitorWatch');
 const CompetitorSnapshot = require('./CompetitorSnapshot');
 const ShopReceipt = require('./ShopReceipt');
 const SalesGeoSnapshot = require('./SalesGeoSnapshot');
+const KeywordSnapshot = require('./KeywordSnapshot');
 
 module.exports = {
   Analysis,
@@ -15,6 +16,7 @@ module.exports = {
   SerpCostLog,
   ListingAudit,
   KeywordSearch,
+  KeywordSnapshot,
   RankCheck,
   CompetitorWatch,
   CompetitorSnapshot,

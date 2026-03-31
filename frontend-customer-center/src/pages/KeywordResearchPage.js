@@ -88,6 +88,7 @@ const KeywordResearchPage = () => {
         ctr: k.ctr || '—',
         competition: k.competition || k.competitionPct || 0,
         trend: k.trend || 'stable',
+        opportunity: k.demandScore || k.opportunityScore || 0,
       }));
       setResults(rows);
       if (rows.length) incrementUsage('keyword_search');
@@ -167,6 +168,37 @@ const KeywordResearchPage = () => {
           {t === 'rising' ? '↑ Rising' : t === 'declining' ? '↓ Declining' : '→ Stable'}
         </Tag>
       ),
+    },
+    {
+      title: 'Opportunity',
+      dataIndex: 'opportunity',
+      key: 'opportunity',
+      width: 110,
+      align: 'center',
+      sorter: (a, b) => a.opportunity - b.opportunity,
+      defaultSortOrder: 'descend',
+      render: (score) => {
+        const color = score >= 75 ? colors.success : score >= 40 ? colors.warning : colors.danger;
+        const label = score >= 75 ? 'Hot' : score >= 40 ? 'Warm' : 'Low';
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+            <div style={{
+              width: 40, height: 6, borderRadius: 3,
+              background: isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${score}%`, height: '100%', borderRadius: 3,
+                background: color,
+              }} />
+            </div>
+            <Tag color={score >= 75 ? 'green' : score >= 40 ? 'orange' : 'red'}
+              style={{ fontSize: 11, fontWeight: 600, margin: 0 }}>
+              {score} {label}
+            </Tag>
+          </div>
+        );
+      },
     },
   ];
 
