@@ -297,8 +297,32 @@ const deepAnalysis = async (req, res) => {
 
     const data = analysis.data;
 
+    // ── Enrich with snapshot intelligence ──
+    let snapshot = null;
+    try {
+      const snap = await KeywordSnapshot.findOne({ keyword: seedKeyword.toLowerCase() })
+        .sort({ snapshotDate: -1 })
+        .select('fusionScore googleTrends freshness velocity snapshotDate')
+        .lean();
+      if (snap) {
+        snapshot = {
+          fusionScore: snap.fusionScore,
+          googleTrends: snap.googleTrends?.interest || null,
+          googleTrendDirection: snap.googleTrends?.trend || null,
+          marketSignal: snap.freshness?.marketSignal || null,
+          velocityPerDay: snap.velocity?.avgViewsPerDay || null,
+          snapshotDate: snap.snapshotDate,
+        };
+      }
+    } catch (snapErr) {
+      log.warn(`deepAnalysis: snapshot enrichment failed: ${snapErr.message}`);
+    }
+
+    // Merge snapshot into data
+    const enrichedData = { ...data, snapshot };
+
     // Cache the full analysis
-    await redis.set(cacheKey, data, 21600);
+    await redis.set(cacheKey, enrichedData, 21600);
 
     // Save to DB
     await KeywordSearch.create({
@@ -324,7 +348,7 @@ const deepAnalysis = async (req, res) => {
 
     return res.json({
       success: true,
-      data,
+      data: enrichedData,
     });
   } catch (error) {
     log.error(`deepAnalysis: EXCEPTION - ${error.message}`, error.stack);

@@ -22,6 +22,7 @@ const redis = require('../cache/redisService');
 const crypto = require('crypto');
 const log = require('../../utils/logger')('KeywordService');
 const { CODE_TO_LOCATION } = require('../../utils/constants/etsyCountries');
+const { getInterestOverTime } = require('../google/googleTrendsService');
 
 /**
  * Search Etsy for a keyword and return enriched results.
@@ -343,6 +344,33 @@ const deepAnalyzeKeyword = async (seedKeyword, options = {}) => {
     ? Math.round(prices.reduce((s, p) => s + p, 0) / prices.length * 100) / 100
     : 0;
 
+  // ── Price Distribution ──
+  let priceDistribution = null;
+  if (prices.length > 0) {
+    const sorted = [...prices].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const medianPrice = sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+    const buckets = [
+      { range: '$0–10', min: 0, max: 10 },
+      { range: '$10–25', min: 10, max: 25 },
+      { range: '$25–50', min: 25, max: 50 },
+      { range: '$50–100', min: 50, max: 100 },
+      { range: '$100+', min: 100, max: Infinity },
+    ];
+    priceDistribution = {
+      min: Math.round(sorted[0] * 100) / 100,
+      max: Math.round(sorted[sorted.length - 1] * 100) / 100,
+      median: Math.round(medianPrice * 100) / 100,
+      avg: avgPrice,
+      ranges: buckets.map(b => {
+        const count = prices.filter(p => p >= b.min && (b.max === Infinity ? true : p < b.max)).length;
+        return { range: b.range, count, pct: Math.round((count / prices.length) * 100) };
+      }),
+    };
+  }
+
   // Competition: tag frequency for seed keyword
   const exactTagMatches = listings.filter(l =>
     (l.tags || []).some(t => t.toLowerCase() === seedKeyword.toLowerCase())
@@ -438,6 +466,85 @@ const deepAnalyzeKeyword = async (seedKeyword, options = {}) => {
     };
   });
 
+  // ── Competitor Listings with SEO Scores (top 5) ──
+  const seedLower = seedKeyword.toLowerCase();
+  const competitors = listings.slice(0, 5).map(l => {
+    const tags = (l.tags || []).map(t => t.toLowerCase().trim());
+
+    // Tag score (30 pts): seed keyword in tags (15) + tag fill ratio (15)
+    const hasSeedTag = tags.includes(seedLower) ? 15 : 0;
+    const tagFill = Math.round((tags.length / 13) * 15);
+    const tagScore = hasSeedTag + tagFill;
+
+    // Title score (25 pts): seed keyword in title (15) + title length optimal 80-140 (10)
+    const titleText = (l.title || '');
+    const hasSeedTitle = titleText.toLowerCase().includes(seedLower) ? 15 : 0;
+    const tLen = titleText.length;
+    const titleLenScore = (tLen >= 80 && tLen <= 140) ? 10 : (tLen >= 40 ? 5 : 0);
+    const titleScore = hasSeedTitle + titleLenScore;
+
+    // Engagement score (25 pts): views (15) + favorites (10), log-scaled
+    const views = l.views || 0;
+    const favs = l.num_favorers || 0;
+    const viewScore = Math.min(15, Math.round(Math.log10(Math.max(views, 1)) * 3));
+    const favScore = Math.min(10, Math.round(Math.log10(Math.max(favs, 1)) * 2.5));
+    const engagementScore = viewScore + favScore;
+
+    // Price competitiveness (20 pts): proximity to market average
+    const listingPrice = parseFloat(l.price?.amount || l.price) / (l.price?.divisor || 100);
+    const priceDiff = avgPrice > 0 ? Math.abs(listingPrice - avgPrice) / avgPrice : 0;
+    const priceScore = Math.max(0, Math.round(20 * (1 - Math.min(priceDiff, 1))));
+
+    const seoScore = Math.min(100, tagScore + titleScore + engagementScore + priceScore);
+
+    // Listing age in days
+    const createdTs = l.created_timestamp ? l.created_timestamp * 1000 : null;
+    const listingAge = createdTs ? Math.round((Date.now() - createdTs) / (86400000)) : null;
+
+    return {
+      title: titleText,
+      price: Math.round(listingPrice * 100) / 100,
+      views,
+      favorites: favs,
+      listingAge,
+      seoScore,
+      seoBreakdown: { tags: tagScore, title: titleScore, engagement: engagementScore, price: priceScore },
+      url: `https://www.etsy.com/listing/${l.listing_id}`,
+    };
+  });
+
+  // ── Google Trends Monthly Data ──
+  let monthlyData = [];
+  let seasonality = 'year-round';
+  let trendFromGoogle = null;
+  try {
+    const geoCode = (country && country.toUpperCase() !== 'GLOBAL') ? country : '';
+    const trendsResult = await getInterestOverTime(seedKeyword, { geo: geoCode });
+    if (trendsResult.success && trendsResult.weekly && trendsResult.weekly.length > 0) {
+      // Aggregate weekly data into monthly buckets
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthlyMap = {};
+      for (const w of trendsResult.weekly) {
+        const d = new Date(w.time);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (!monthlyMap[key]) monthlyMap[key] = { sum: 0, count: 0, month: monthNames[d.getMonth()], time: d.getTime() };
+        monthlyMap[key].sum += w.value;
+        monthlyMap[key].count++;
+      }
+      monthlyData = Object.values(monthlyMap)
+        .sort((a, b) => a.time - b.time)
+        .map(m => ({ month: m.month, vol: Math.round(m.sum / m.count) }));
+
+      seasonality = trendsResult.seasonality || 'year-round';
+      trendFromGoogle = trendsResult.trend;
+    }
+  } catch (tErr) {
+    log.warn(`deepAnalyzeKeyword: Google Trends failed for "${seedKeyword}": ${tErr.message}`);
+  }
+
+  // Use Google Trends direction if available, otherwise fall back to fav-view heuristic
+  const finalTrend = trendFromGoogle || trend;
+
   return {
     success: true,
     data: {
@@ -447,12 +554,14 @@ const deepAnalyzeKeyword = async (seedKeyword, options = {}) => {
       avgPrice,
       totalListings: totalResults,
       ctr: ctrProxy > 0 ? `${ctrProxy}%` : '—',
-      seasonality: 'year-round',
-      trend,
+      seasonality,
+      trend: finalTrend,
       trendPct,
-      monthlyData: [],
+      monthlyData,
       relatedKeywords: enrichedRelated,
       suggestedTags,
+      priceDistribution,
+      competitors,
     },
     serpCalls,
     error: null,
