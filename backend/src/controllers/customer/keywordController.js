@@ -406,8 +406,8 @@ const TRENDING_DISPLAY_COUNT = {
   'basic':     7,
   'starter':   7,
   'pro':       10,
-  'pro plus':  30,
-  'pro_plus':  30,
+  'pro plus':  7,
+  'pro_plus':  7,
   'elite':     30,
   'unlimited': 30,
 };
