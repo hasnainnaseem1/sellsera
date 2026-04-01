@@ -36,7 +36,9 @@ const fetchListings = async (keyword, limit = 100, options = {}) => {
 
   const params = { keywords: keyword, limit, sort_on: 'score' };
   if (offset) params.offset = offset;
-  if (country) params.shop_location = CODE_TO_LOCATION[country] || country;
+  if (country && country.toUpperCase() !== 'GLOBAL') {
+    params.shop_location = CODE_TO_LOCATION[country] || country;
+  }
 
   const result = await etsyApi.publicRequest(
     'GET',
