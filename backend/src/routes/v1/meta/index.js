@@ -78,41 +78,23 @@ router.get('/categories', async (req, res) => {
       });
     }
 
-    // Build parent→children tree from flat list
-    const nodes = result.data.results;
-    const nodeMap = new Map();
-    const roots = [];
-
-    // Index all nodes
-    for (const n of nodes) {
-      nodeMap.set(n.id, {
+    // Etsy returns a nested tree — recursively map to Cascader format
+    const mapNode = (n) => {
+      const node = {
         value: String(n.id),
         label: n.name,
-        id: n.id,
-        parentId: n.parent_id,
-        children: [],
-      });
-    }
-
-    // Build tree
-    for (const n of nodes) {
-      const node = nodeMap.get(n.id);
-      if (n.parent_id && nodeMap.has(n.parent_id)) {
-        nodeMap.get(n.parent_id).children.push(node);
-      } else {
-        roots.push(node);
+      };
+      if (n.children && n.children.length > 0) {
+        node.children = n.children
+          .map(mapNode)
+          .sort((a, b) => a.label.localeCompare(b.label));
       }
-    }
-
-    // Sort alphabetically at each level
-    const sortTree = (items) => {
-      items.sort((a, b) => a.label.localeCompare(b.label));
-      for (const item of items) {
-        if (item.children.length > 0) sortTree(item.children);
-        else delete item.children; // Remove empty arrays for cleaner JSON
-      }
+      return node;
     };
-    sortTree(roots);
+
+    const roots = result.data.results
+      .map(mapNode)
+      .sort((a, b) => a.label.localeCompare(b.label));
 
     // Cache for 24 hours
     await redis.set(CACHE_KEY, roots, 86400);
