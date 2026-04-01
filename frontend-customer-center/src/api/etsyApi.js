@@ -56,6 +56,7 @@ const etsyApi = {
   getDeliveryStatus:  (params = {}) => axiosInstance.get('/api/v1/customer/logistics/delivery-status', { params }).then(r => r.data),
   getSalesMap:        (params = {}) => axiosInstance.get('/api/v1/customer/logistics/sales-map', { params }).then(r => r.data),
   getSalesMapHistory: (params = {}) => axiosInstance.get('/api/v1/customer/logistics/sales-map/history', { params }).then(r => r.data),
+  syncReceipts:       () => axiosInstance.post('/api/v1/customer/logistics/sync-receipts').then(r => r.data),
 };
 
 export default etsyApi;

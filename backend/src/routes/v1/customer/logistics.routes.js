@@ -37,4 +37,13 @@ router.get('/sales-map/history',
   logisticsController.getSalesMapHistory
 );
 
+// @route   POST /api/v1/customer/logistics/sync-receipts
+// @desc    Trigger manual receipt sync from Etsy
+// @access  Private — needs subscription + Etsy shop
+router.post('/sync-receipts',
+  checkSubscription,
+  checkShopConnection,
+  logisticsController.syncReceipts
+);
+
 module.exports = router;
