@@ -233,20 +233,33 @@ function scoreTag(tag, title, category) {
 }
 
 function generateSuggestion(tag, title) {
+  const MAX_TAG_LEN = 20; // Etsy's per-tag character limit
   const titleWords = title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
   const tagWords = tag.toLowerCase().split(/\s+/);
 
-  // Suggest adding a title word to make it more relevant
+  // Suggest adding a title word — only if the result fits Etsy's 20-char limit
   const unusedTitleWord = titleWords.find(w => !tagWords.includes(w));
   if (unusedTitleWord && tag.split(/\s+/).length < 3) {
-    return `Try "${tag} ${unusedTitleWord}" for better relevance`;
+    const combined = `${tag} ${unusedTitleWord}`;
+    if (combined.length <= MAX_TAG_LEN) {
+      return `Try "${combined}" for better relevance`;
+    }
+    // Combined too long — suggest a shorter alternative
+    const shorterWord = titleWords.find(w => !tagWords.includes(w) && (`${tag} ${w}`).length <= MAX_TAG_LEN);
+    if (shorterWord) {
+      return `Try "${tag} ${shorterWord}" for better relevance`;
+    }
+  }
+
+  if (tag.length > MAX_TAG_LEN) {
+    return `Tag exceeds ${MAX_TAG_LEN} chars — shorten to fit Etsy's limit`;
   }
 
   if (tag.split(/\s+/).length === 1) {
-    return 'Use multi-word phrases instead of single words for better targeting';
+    return 'Use multi-word phrases (under 20 chars) for better targeting';
   }
 
-  return 'Consider replacing with a more relevant long-tail keyword';
+  return 'Consider replacing with a relevant long-tail keyword (max 20 chars)';
 }
 
 function hashKey(str) {
@@ -297,8 +310,9 @@ async function getReplacementSuggestions(userId, currentTags, title) {
       }
     }
 
-    // Sort by score, return top 5 suggestions
+    // Sort by score, filter to Etsy's 20-char tag limit, return top 5
     return [...keywordPool.values()]
+      .filter(k => k.keyword.length <= 20)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
   } catch {

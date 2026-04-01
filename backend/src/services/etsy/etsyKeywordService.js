@@ -186,7 +186,7 @@ const getRelatedKeywords = async (seedKeyword, options = {}) => {
   for (const listing of listings) {
     for (const tag of (listing.tags || [])) {
       const normalized = tag.toLowerCase().trim();
-      if (normalized && normalized !== seedLower) {
+      if (normalized && normalized !== seedLower && normalized.length <= 20) {
         tagFrequency[normalized] = (tagFrequency[normalized] || 0) + 1;
         tagViewAccum[normalized] = (tagViewAccum[normalized] || 0) + (listing.views || 0);
         tagFavorites[normalized] = (tagFavorites[normalized] || 0) + (listing.num_favorers || 0);
@@ -393,14 +393,15 @@ const deepAnalyzeKeyword = async (seedKeyword, options = {}) => {
   for (const listing of listings) {
     for (const tag of (listing.tags || [])) {
       const normalized = tag.toLowerCase().trim();
-      if (normalized && normalized !== seedKeyword.toLowerCase() && normalized.length > 2) {
+      if (normalized && normalized !== seedKeyword.toLowerCase() && normalized.length > 2 && normalized.length <= 20) {
         tagFrequency[normalized] = (tagFrequency[normalized] || 0) + 1;
       }
     }
   }
 
-  // Top related keywords sorted by frequency
+  // Top related keywords sorted by frequency (≤20 chars for Etsy tag limit)
   const relatedKeywords = Object.entries(tagFrequency)
+    .filter(([kw]) => kw.length <= 20)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 15)
     .map(([kw, freq]) => ({
@@ -408,8 +409,9 @@ const deepAnalyzeKeyword = async (seedKeyword, options = {}) => {
       relevance: Math.round((freq / listings.length) * 100),
     }));
 
-  // Suggested tags: top 13 most frequent tags (Etsy max is 13)
+  // Suggested tags: top 13 most frequent tags (Etsy max is 13, ≤20 chars each)
   const suggestedTags = Object.entries(tagFrequency)
+    .filter(([kw]) => kw.length <= 20)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 13)
     .map(([kw]) => kw);
