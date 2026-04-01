@@ -39,6 +39,7 @@ const etsyApi = {
 
   // Tag analyzer
   analyzeTags:     (data) => axiosInstance.post('/api/v1/customer/tag-analyzer', data).then(r => r.data),
+  getTagHistory:   (params = {}) => axiosInstance.get('/api/v1/customer/tag-analyzer/history', { params }).then(r => r.data),
 
   // Competitors
   addCompetitor:      (data) => axiosInstance.post('/api/v1/customer/competitors/watch', data).then(r => r.data),

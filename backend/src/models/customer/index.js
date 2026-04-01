@@ -9,6 +9,7 @@ const CompetitorSnapshot = require('./CompetitorSnapshot');
 const ShopReceipt = require('./ShopReceipt');
 const SalesGeoSnapshot = require('./SalesGeoSnapshot');
 const KeywordSnapshot = require('./KeywordSnapshot');
+const TagAnalysis = require('./TagAnalysis');
 
 module.exports = {
   Analysis,
@@ -22,4 +23,5 @@ module.exports = {
   CompetitorSnapshot,
   ShopReceipt,
   SalesGeoSnapshot,
+  TagAnalysis,
 };

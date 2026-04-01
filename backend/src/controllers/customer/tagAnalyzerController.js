@@ -12,10 +12,11 @@
  * - Suggestions for low-scoring tags
  */
 
-const { SerpCostLog } = require('../../models/customer');
-const { KeywordSearch } = require('../../models/customer');
+const { SerpCostLog, KeywordSearch, TagAnalysis } = require('../../models/customer');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
+const { CODE_TO_LOCATION } = require('../../utils/constants/etsyCountries');
+const { isPlanAllowed } = require('../../utils/constants/countryTiers');
 const crypto = require('crypto');
 const log = require('../../utils/logger')('TagAnalyzer');
 
@@ -26,12 +27,23 @@ const SERP_COST_PER_REQ = 0.0025;
  */
 const analyzeTags = async (req, res) => {
   try {
-    const { tags, title, category } = req.body;
+    const { tags, title, category, country: rawCountry } = req.body;
+    const country = (rawCountry || 'US').toUpperCase().trim();
 
     if (!tags || !Array.isArray(tags) || tags.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'At least one tag is required',
+      });
+    }
+
+    // Plan-tier country gating
+    const planName = req.user?.planSnapshot?.planName || 'free';
+    if (!isPlanAllowed(planName, country)) {
+      return res.status(403).json({
+        success: false,
+        errorCode: 'UPGRADE_REQUIRED',
+        message: `Your current plan does not include access to the ${country} market. Please upgrade.`,
       });
     }
 
@@ -42,6 +54,13 @@ const analyzeTags = async (req, res) => {
       .map(t => (typeof t === 'string' ? t.trim() : ''))
       .filter(t => t.length > 0)
       .slice(0, 13);
+
+    // Build search params with country support
+    const baseSearchParams = { limit: 25 };
+    if (country && country !== 'GLOBAL') {
+      const loc = CODE_TO_LOCATION[country] || country;
+      baseSearchParams.shop_location = loc;
+    }
 
     let totalSerpCalls = 0;
     const results = [];
@@ -55,7 +74,7 @@ const analyzeTags = async (req, res) => {
         const searchResult = await etsyApi.publicRequest(
           'GET',
           '/v3/application/listings/active',
-          { params: { keywords: tag, limit: 25 } }
+          { params: { ...baseSearchParams, keywords: tag } }
         );
         totalSerpCalls++;
 
@@ -119,22 +138,41 @@ const analyzeTags = async (req, res) => {
       });
     }
 
+    const summary = {
+      totalTags: results.length,
+      maxTags: 13,
+      averageScore: avgScore,
+      excellent,
+      good,
+      needsWork,
+      missingTags: Math.max(0, 13 - tagList.length),
+    };
+
+    const suggestedReplacements = needsWork > 0
+      ? await getReplacementSuggestions(req.userId, tagList, listingTitle)
+      : [];
+
+    // Persist analysis to DB
+    try {
+      await TagAnalysis.create({
+        userId: req.userId,
+        listingTitle,
+        category: category || '',
+        country,
+        tags: results,
+        summary,
+        suggestedReplacements,
+      });
+    } catch (saveErr) {
+      log.warn('Failed to save tag analysis:', saveErr.message);
+    }
+
     return res.json({
       success: true,
       data: {
         tags: results,
-        summary: {
-          totalTags: results.length,
-          maxTags: 13,
-          averageScore: avgScore,
-          excellent,
-          good,
-          needsWork,
-          missingTags: Math.max(0, 13 - tagList.length),
-        },
-        suggestedReplacements: needsWork > 0
-          ? await getReplacementSuggestions(req.userId, tagList, listingTitle)
-          : [],
+        summary,
+        suggestedReplacements,
       },
     });
   } catch (error) {
@@ -268,4 +306,42 @@ async function getReplacementSuggestions(userId, currentTags, title) {
   }
 }
 
-module.exports = { analyzeTags };
+/**
+ * GET /api/v1/customer/tag-analyzer/history
+ */
+const getTagHistory = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [analyses, total] = await Promise.all([
+      TagAnalysis.find({ userId: req.userId })
+        .sort({ analyzedAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .select('listingTitle category country tags summary analyzedAt'),
+      TagAnalysis.countDocuments({ userId: req.userId }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        analyses,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+      },
+    });
+  } catch (error) {
+    log.error('Tag history error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve tag analysis history',
+    });
+  }
+};
+
+module.exports = { analyzeTags, getTagHistory };

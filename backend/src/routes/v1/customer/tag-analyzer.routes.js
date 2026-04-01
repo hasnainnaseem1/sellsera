@@ -15,4 +15,12 @@ router.post('/',
   tagAnalyzerController.analyzeTags
 );
 
+// @route   GET /api/v1/customer/tag-analyzer/history
+// @desc    Get tag analysis history
+// @access  Private
+router.get('/history',
+  checkSubscription,
+  tagAnalyzerController.getTagHistory
+);
+
 module.exports = router;
