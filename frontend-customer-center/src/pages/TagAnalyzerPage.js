@@ -422,7 +422,7 @@ const TagAnalyzerPage = () => {
                   size="large"
                   style={{ width: '100%' }}
                   loading={categoriesLoading}
-                  fieldNames={{ label: 'label', value: 'value', children: 'children' }}
+                  fieldNames={{ label: 'label', value: 'label', children: 'children' }}
                 />
               </Col>
             </Row>

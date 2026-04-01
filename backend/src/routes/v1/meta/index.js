@@ -98,7 +98,7 @@ router.get('/categories', async (req, res) => {
 
     // Cache for 24 hours
     await redis.set(CACHE_KEY, roots, 86400);
-    log.info(`Taxonomy cached: ${roots.length} top-level categories, ${nodes.length} total nodes`);
+    log.info(`Taxonomy cached: ${roots.length} top-level categories`);
 
     res.json({ success: true, data: roots });
   } catch (error) {
