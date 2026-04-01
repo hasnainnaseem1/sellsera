@@ -27,6 +27,7 @@ const etsyApi = {
   searchKeywords:  (data) => axiosInstance.post('/api/v1/customer/keywords/search', data).then(r => r.data),
   deepAnalysis:    (data) => axiosInstance.post('/api/v1/customer/keywords/deep-analysis', data).then(r => r.data),
   getKeywordHistory: (params = {}) => axiosInstance.get('/api/v1/customer/keywords/history', { params }).then(r => r.data),
+  getTrendingKeywords: (params = {}) => axiosInstance.get('/api/v1/customer/keywords/trending', { params }).then(r => r.data),
 
   // Meta
   getCountries:    () => axiosInstance.get('/api/v1/meta/countries').then(r => r.data),

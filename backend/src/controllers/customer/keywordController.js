@@ -4,12 +4,15 @@
  * POST /api/v1/customer/keywords/search        → Basic keyword search
  * POST /api/v1/customer/keywords/deep-analysis  → Deep keyword analysis (20 sub-queries per seed)
  * GET  /api/v1/customer/keywords/history        → Keyword search history
+ * GET  /api/v1/customer/keywords/trending        → Trending keywords from snapshot data
  * 
  * Feature keys: keyword_search, keyword_deep_analysis
  */
 
 const { KeywordSearch } = require('../../models/customer');
 const { SerpCostLog } = require('../../models/customer');
+const KeywordSnapshot = require('../../models/customer/KeywordSnapshot');
+const seedKeywordCategories = require('../../utils/constants/seedKeywords').categories;
 const keywordService = require('../../services/etsy/etsyKeywordService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
@@ -173,11 +176,44 @@ const searchKeywords = async (req, res) => {
     const slicedResults = Number.isFinite(maxResults) ? results.slice(0, maxResults) : results;
     log.info(`searchKeywords: plan="${resolvedPlan}" limit=${maxResults} total=${results.length} returned=${slicedResults.length}`);
 
+    // ── Enrich with snapshot data (fusion score, Google Trends, freshness) ──
+    const kwList = slicedResults.map(r => (r.keyword || '').toLowerCase());
+    let snapshotMap = {};
+    try {
+      const snapshots = await KeywordSnapshot.find({
+        keyword: { $in: kwList },
+      })
+        .sort({ snapshotDate: -1 })
+        .lean();
+      // Keep only the most recent snapshot per keyword
+      for (const snap of snapshots) {
+        if (!snapshotMap[snap.keyword]) {
+          snapshotMap[snap.keyword] = snap;
+        }
+      }
+    } catch (snapErr) {
+      log.warn(`searchKeywords: snapshot enrichment failed: ${snapErr.message}`);
+    }
+
+    const enrichedResults = slicedResults.map(r => {
+      const snap = snapshotMap[(r.keyword || '').toLowerCase()];
+      if (!snap) return r;
+      return {
+        ...r,
+        fusionScore: snap.fusionScore,
+        googleTrendsInterest: snap.googleTrends?.interest ?? null,
+        googleTrendDirection: snap.googleTrends?.trend ?? null,
+        marketFreshness: snap.freshness?.marketSignal ?? null,
+        velocityPerDay: snap.velocity?.avgViewsPerDay ?? null,
+        snapshotDate: snap.snapshotDate,
+      };
+    });
+
     return res.json({
       success: true,
       data: {
         keyword: seedKeyword,
-        results: slicedResults,
+        results: enrichedResults,
         cached: false,
         totalResults: searchData.totalResults,
         totalKeywords: results.length,
@@ -345,4 +381,148 @@ function hashKey(str) {
   return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
 }
 
-module.exports = { searchKeywords, deepAnalysis, getKeywordHistory };
+/**
+ * GET /api/v1/customer/keywords/trending
+ * Returns trending keywords from snapshot data — rising, hot, declining.
+ * Query params: category (optional), limit (default 30)
+ */
+const getTrendingKeywords = async (req, res) => {
+  try {
+    const { category, limit = 30 } = req.query;
+    const maxLimit = Math.min(parseInt(limit) || 30, 100);
+
+    // Build keyword filter based on category
+    let keywordFilter = {};
+    if (category && seedKeywordCategories[category]) {
+      keywordFilter = { keyword: { $in: seedKeywordCategories[category].map(k => k.toLowerCase()) } };
+    }
+
+    // Get the most recent snapshot date
+    const latestSnapshot = await KeywordSnapshot.findOne()
+      .sort({ snapshotDate: -1 })
+      .select('snapshotDate')
+      .lean();
+
+    if (!latestSnapshot) {
+      return res.json({
+        success: true,
+        data: { trending: [], categories: Object.keys(seedKeywordCategories), lastUpdated: null },
+      });
+    }
+
+    const latestDate = latestSnapshot.snapshotDate;
+
+    // Get latest snapshots with fusion scores
+    const latest = await KeywordSnapshot.find({
+      ...keywordFilter,
+      snapshotDate: latestDate,
+      fusionScore: { $ne: null },
+    })
+      .sort({ fusionScore: -1 })
+      .limit(maxLimit * 3) // fetch extra to compute WoW
+      .select('keyword totalResults avgViews avgFavorites competitionPct fusionScore googleTrends freshness velocity snapshotDate')
+      .lean();
+
+    if (!latest.length) {
+      return res.json({
+        success: true,
+        data: { trending: [], categories: Object.keys(seedKeywordCategories), lastUpdated: latestDate },
+      });
+    }
+
+    // Get previous snapshots for WoW comparison
+    const prevDate = new Date(latestDate);
+    prevDate.setDate(prevDate.getDate() - 7);
+
+    const prevSnapshots = await KeywordSnapshot.find({
+      keyword: { $in: latest.map(s => s.keyword) },
+      snapshotDate: { $gte: prevDate, $lt: latestDate },
+    })
+      .select('keyword fusionScore totalResults')
+      .lean();
+
+    // Build prev lookup (average if multiple)
+    const prevMap = {};
+    for (const p of prevSnapshots) {
+      if (!prevMap[p.keyword]) prevMap[p.keyword] = { scores: [], results: [] };
+      prevMap[p.keyword].scores.push(p.fusionScore || 0);
+      prevMap[p.keyword].results.push(p.totalResults || 0);
+    }
+
+    // Enrich with trend direction
+    const enriched = latest.map(snap => {
+      const prev = prevMap[snap.keyword];
+      let trendDirection = 'new'; // no prior data
+      let fusionChange = null;
+      let volumeChange = null;
+
+      if (prev && prev.scores.length > 0) {
+        const avgPrevScore = prev.scores.reduce((a, b) => a + b, 0) / prev.scores.length;
+        const avgPrevResults = prev.results.reduce((a, b) => a + b, 0) / prev.results.length;
+        fusionChange = avgPrevScore > 0
+          ? Math.round(((snap.fusionScore - avgPrevScore) / avgPrevScore) * 100)
+          : null;
+        volumeChange = avgPrevResults > 0
+          ? Math.round(((snap.totalResults - avgPrevResults) / avgPrevResults) * 100)
+          : null;
+
+        if (fusionChange > 5) trendDirection = 'rising';
+        else if (fusionChange < -5) trendDirection = 'declining';
+        else trendDirection = 'stable';
+      }
+
+      // Determine category
+      let kwCategory = null;
+      for (const [catName, catKeywords] of Object.entries(seedKeywordCategories)) {
+        if (catKeywords.some(k => k.toLowerCase() === snap.keyword)) {
+          kwCategory = catName;
+          break;
+        }
+      }
+
+      return {
+        keyword: snap.keyword,
+        fusionScore: snap.fusionScore,
+        totalResults: snap.totalResults,
+        avgViews: snap.avgViews,
+        avgFavorites: snap.avgFavorites,
+        competition: snap.competitionPct,
+        googleTrends: snap.googleTrends?.interest || null,
+        googleTrendDirection: snap.googleTrends?.trend || null,
+        freshness: snap.freshness?.marketSignal || null,
+        velocity: snap.velocity?.avgViewsPerDay || null,
+        trendDirection,
+        fusionChange,
+        volumeChange,
+        category: kwCategory,
+        snapshotDate: snap.snapshotDate,
+      };
+    });
+
+    // Sort: rising first, then by fusion score
+    enriched.sort((a, b) => {
+      const dirOrder = { rising: 0, new: 1, stable: 2, declining: 3 };
+      const dA = dirOrder[a.trendDirection] ?? 2;
+      const dB = dirOrder[b.trendDirection] ?? 2;
+      if (dA !== dB) return dA - dB;
+      return (b.fusionScore || 0) - (a.fusionScore || 0);
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        trending: enriched.slice(0, maxLimit),
+        categories: Object.keys(seedKeywordCategories),
+        lastUpdated: latestDate,
+      },
+    });
+  } catch (error) {
+    log.error('Trending keywords error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve trending keywords',
+    });
+  }
+};
+
+module.exports = { searchKeywords, deepAnalysis, getKeywordHistory, getTrendingKeywords };

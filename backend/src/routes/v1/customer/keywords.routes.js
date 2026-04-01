@@ -34,4 +34,13 @@ router.get('/history',
   keywordController.getKeywordHistory
 );
 
+// @route   GET /api/v1/customer/keywords/trending
+// @desc    Get trending keywords from snapshot data (rising, hot, declining)
+// @access  Private — needs subscription + keyword_search feature
+router.get('/trending',
+  checkSubscription,
+  checkFeatureAccess('keyword_search'),
+  keywordController.getTrendingKeywords
+);
+
 module.exports = router;

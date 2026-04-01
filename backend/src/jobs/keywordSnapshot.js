@@ -19,13 +19,14 @@ const KeywordSnapshot = require('../models/customer/KeywordSnapshot');
 const { fetchListings } = require('../services/etsy/etsyKeywordService');
 const rateLimiter = require('../services/etsy/rateLimiter');
 const { getInterestOverTime } = require('../services/google/googleTrendsService');
+const seedKeywords = require('../utils/constants/seedKeywords');
 const log = require('../utils/logger')('CronKeywordSnapshot');
 
-const MAX_KEYWORDS = 500;
+const BATCH_SIZE = 300;          // keywords per nightly run
 const RESERVED_QUOTA = 1000;
 const LISTINGS_PER_KEYWORD = 25;
 const ETSY_DELAY_MS = 200;
-const TRENDS_DELAY_MS = 4000; // Google Trends needs more spacing
+const TRENDS_DELAY_MS = 4000;    // Google Trends needs more spacing
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -74,24 +75,53 @@ const run = async () => {
 
   const budget = remaining - RESERVED_QUOTA;
 
-  // ── 2. Aggregate the most-searched keywords (last 90 days) ──
+  // ── 2. Build keyword list: seed keywords + user-searched keywords ──
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const topKeywords = await KeywordSearch.aggregate([
+  // Grab user-searched keywords (these always get priority)
+  const userKeywords = await KeywordSearch.aggregate([
     { $match: { createdAt: { $gte: ninetyDaysAgo } } },
     { $group: { _id: { $toLower: '$seedKeyword' }, count: { $sum: 1 } } },
     { $sort: { count: -1 } },
-    { $limit: MAX_KEYWORDS },
+    { $limit: 500 },
   ]);
+  const userKwSet = new Set(userKeywords.map((e) => e._id));
 
-  if (!topKeywords.length) {
-    log.info('No keyword search history found — nothing to snapshot');
+  // Merge: user keywords first, then seed keywords (deduped)
+  const fullList = [...userKwSet];
+  for (const kw of seedKeywords) {
+    if (!userKwSet.has(kw)) fullList.push(kw);
+  }
+
+  log.info(`Total keyword pool: ${fullList.length} (${userKwSet.size} user + ${fullList.length - userKwSet.size} seed)`);
+
+  // ── 3. Rotating daily batch ──
+  // Day-of-year determines which slice of the seed list we run.
+  // User keywords always run; we fill the rest with a rotating batch.
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const totalBatches = Math.ceil(fullList.length / BATCH_SIZE);
+  const batchIndex = dayOfYear % totalBatches;
+  const batchStart = batchIndex * BATCH_SIZE;
+  const batchEnd = Math.min(batchStart + BATCH_SIZE, fullList.length);
+  const keywordsToProcess = fullList.slice(batchStart, batchEnd);
+
+  // Ensure all user keywords are included even if outside current batch
+  for (const uk of userKwSet) {
+    if (!keywordsToProcess.includes(uk)) keywordsToProcess.push(uk);
+  }
+
+  // Respect Etsy API budget
+  const capped = keywordsToProcess.slice(0, budget);
+
+  if (!capped.length) {
+    log.info('No keywords to process — nothing to snapshot');
     return;
   }
 
-  const keywordsToProcess = topKeywords.slice(0, Math.min(topKeywords.length, budget));
-  log.info(`Snapshotting ${keywordsToProcess.length} keywords (budget ${budget} Etsy calls)`);
+  log.info(`Batch ${batchIndex + 1}/${totalBatches}: processing ${capped.length} keywords (budget ${budget} Etsy calls)`);
 
   // ── 3. Today's snapshot date (midnight UTC) ──
   const today = new Date();
@@ -104,8 +134,7 @@ const run = async () => {
   let trendsSuccess = 0;
   let trendsFailed = 0;
 
-  for (const entry of keywordsToProcess) {
-    const keyword = entry._id;
+  for (const keyword of capped) {
     try {
       // Re-check Etsy quota every 50 keywords
       if (saved > 0 && saved % 50 === 0) {

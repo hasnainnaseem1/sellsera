@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card, Input, Select, Button, Table, Tag, Typography, Row, Col,
-  Space, Empty, message, theme, Modal,
+  Space, Empty, message, theme, Modal, Tooltip, Spin, Segmented,
 } from 'antd';
 import {
   SearchOutlined, GlobalOutlined, KeyOutlined, LockOutlined, CrownOutlined,
+  FireOutlined, RiseOutlined, FallOutlined, ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
@@ -54,13 +55,45 @@ const KeywordResearchPage = () => {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [lockedCountry, setLockedCountry] = useState(null);
 
+  // Trending keywords state
+  const [trending, setTrending] = useState([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
+  const [trendCategories, setTrendCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [trendLastUpdated, setTrendLastUpdated] = useState(null);
+
   useEffect(() => {
     etsyApi.getCountries()
       .then(res => {
         if (res.success && res.data?.length) setCountries(res.data);
       })
       .catch(() => {});
+    // Load trending keywords on mount
+    fetchTrending('all');
   }, []);
+
+  const fetchTrending = async (category) => {
+    setTrendingLoading(true);
+    try {
+      const params = { limit: 30 };
+      if (category && category !== 'all') params.category = category;
+      const res = await etsyApi.getTrendingKeywords(params);
+      if (res.success) {
+        setTrending(res.data?.trending || []);
+        setTrendCategories(res.data?.categories || []);
+        setTrendLastUpdated(res.data?.lastUpdated);
+      }
+    } catch {
+      // silently fail — trending is supplementary
+    } finally {
+      setTrendingLoading(false);
+    }
+  };
+
+  const handleCategoryChange = (val) => {
+    setSelectedCategory(val);
+    fetchTrending(val);
+  };
 
   const card = {
     borderRadius: radii.lg,
@@ -89,6 +122,11 @@ const KeywordResearchPage = () => {
         competition: k.competition || k.competitionPct || 0,
         trend: k.trend || 'stable',
         opportunity: k.demandScore || k.opportunityScore || 0,
+        fusionScore: k.fusionScore ?? null,
+        googleTrends: k.googleTrendsInterest ?? null,
+        googleTrendDir: k.googleTrendDirection ?? null,
+        freshness: k.marketFreshness ?? null,
+        velocity: k.velocityPerDay ?? null,
       }));
       setResults(rows);
       if (rows.length) incrementUsage('keyword_search');
@@ -161,42 +199,59 @@ const KeywordResearchPage = () => {
       title: 'Trend',
       dataIndex: 'trend',
       key: 'trend',
-      width: 80,
+      width: 100,
       align: 'center',
-      render: (t) => (
-        <Tag color={t === 'rising' ? 'green' : t === 'declining' ? 'red' : 'default'} style={{ fontSize: 11 }}>
-          {t === 'rising' ? '↑ Rising' : t === 'declining' ? '↓ Declining' : '→ Stable'}
-        </Tag>
-      ),
+      render: (t, row) => {
+        // Use Google Trends direction if available from snapshot
+        const dir = row.googleTrendDir || t;
+        const icon = dir === 'rising' ? <RiseOutlined /> : dir === 'declining' ? <FallOutlined /> : null;
+        const label = dir === 'rising' ? 'Rising' : dir === 'declining' ? 'Declining' : 'Stable';
+        const color = dir === 'rising' ? 'green' : dir === 'declining' ? 'red' : 'default';
+        return (
+          <Tooltip title={row.googleTrends != null ? `Google Trends: ${row.googleTrends}/100` : 'Based on Etsy data'}>
+            <Tag color={color} style={{ fontSize: 11 }}>
+              {icon} {label}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Opportunity',
       dataIndex: 'opportunity',
       key: 'opportunity',
-      width: 110,
+      width: 130,
       align: 'center',
-      sorter: (a, b) => a.opportunity - b.opportunity,
+      sorter: (a, b) => (a.fusionScore ?? a.opportunity) - (b.fusionScore ?? b.opportunity),
       defaultSortOrder: 'descend',
-      render: (score) => {
-        const color = score >= 75 ? colors.success : score >= 40 ? colors.warning : colors.danger;
-        const label = score >= 75 ? 'Hot' : score >= 40 ? 'Warm' : 'Low';
+      render: (score, row) => {
+        // Prefer fusion score from snapshot data if available
+        const displayScore = row.fusionScore ?? score;
+        const color = displayScore >= 75 ? colors.success : displayScore >= 40 ? colors.warning : colors.danger;
+        const label = displayScore >= 75 ? 'Hot' : displayScore >= 40 ? 'Warm' : 'Low';
+        const source = row.fusionScore != null ? '5-Layer AI' : 'Etsy Data';
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-            <div style={{
-              width: 40, height: 6, borderRadius: 3,
-              background: isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0',
-              overflow: 'hidden',
-            }}>
+          <Tooltip title={`${source} Score: ${displayScore}/100${row.freshness ? ` | Market: ${row.freshness}` : ''}${row.velocity != null ? ` | ${row.velocity} views/day` : ''}`}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
               <div style={{
-                width: `${score}%`, height: '100%', borderRadius: 3,
-                background: color,
-              }} />
+                width: 40, height: 6, borderRadius: 3,
+                background: isDark ? 'rgba(255,255,255,0.1)' : '#f0f0f0',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  width: `${displayScore}%`, height: '100%', borderRadius: 3,
+                  background: color,
+                }} />
+              </div>
+              <Tag color={displayScore >= 75 ? 'green' : displayScore >= 40 ? 'orange' : 'red'}
+                style={{ fontSize: 11, fontWeight: 600, margin: 0 }}>
+                {displayScore} {label}
+              </Tag>
+              {row.fusionScore != null && (
+                <ThunderboltOutlined style={{ fontSize: 10, color: colors.brand }} />
+              )}
             </div>
-            <Tag color={score >= 75 ? 'green' : score >= 40 ? 'orange' : 'red'}
-              style={{ fontSize: 11, fontWeight: 600, margin: 0 }}>
-              {score} {label}
-            </Tag>
-          </div>
+          </Tooltip>
         );
       },
     },
@@ -299,6 +354,7 @@ const KeywordResearchPage = () => {
                 loading={loading}
                 size="large"
                 block
+                data-search-btn="true"
                 style={{
                   background: `linear-gradient(135deg, ${colors.brand}, ${colors.brandLight})`,
                   border: 'none', borderRadius: radii.sm, fontWeight: 600,
@@ -309,6 +365,111 @@ const KeywordResearchPage = () => {
             </Col>
           </Row>
         </Card>
+
+        {/* Trending Keywords Section */}
+        {!searched && (
+          <Card
+            style={{ ...card, marginBottom: 24 }}
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <FireOutlined style={{ color: '#ff4d4f', fontSize: 18 }} />
+                <span style={{ fontWeight: 600, fontSize: 15 }}>Trending Keywords</span>
+                {trendLastUpdated && (
+                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 'auto', fontWeight: 400 }}>
+                    Updated: {new Date(trendLastUpdated).toLocaleDateString()}
+                  </Text>
+                )}
+              </div>
+            }
+          >
+            {trendCategories.length > 0 && (
+              <div style={{ marginBottom: 16, overflowX: 'auto' }}>
+                <Segmented
+                  value={selectedCategory}
+                  onChange={handleCategoryChange}
+                  options={[
+                    { label: 'All Categories', value: 'all' },
+                    ...trendCategories.map(c => ({
+                      label: c.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim(),
+                      value: c,
+                    })),
+                  ]}
+                  style={{ fontSize: 12 }}
+                />
+              </div>
+            )}
+
+            {trendingLoading ? (
+              <div style={{ textAlign: 'center', padding: 40 }}>
+                <Spin tip="Loading trending keywords..." />
+              </div>
+            ) : trending.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {trending.map((t, i) => {
+                  const isRising = t.trendDirection === 'rising';
+                  const isDeclining = t.trendDirection === 'declining';
+                  const isNew = t.trendDirection === 'new';
+                  const scoreColor = t.fusionScore >= 75 ? colors.success : t.fusionScore >= 40 ? colors.warning : colors.danger;
+                  return (
+                    <Tooltip
+                      key={i}
+                      title={
+                        <div style={{ fontSize: 12 }}>
+                          <div><strong>{t.keyword}</strong></div>
+                          <div>Fusion Score: {t.fusionScore}/100</div>
+                          {t.totalResults > 0 && <div>Etsy Results: {t.totalResults.toLocaleString()}</div>}
+                          {t.googleTrends != null && <div>Google Trends: {t.googleTrends}/100</div>}
+                          {t.freshness && <div>Market: {t.freshness}</div>}
+                          {t.competition > 0 && <div>Competition: {t.competition}%</div>}
+                          {t.fusionChange != null && <div>WoW Change: {t.fusionChange > 0 ? '+' : ''}{t.fusionChange}%</div>}
+                        </div>
+                      }
+                    >
+                      <Tag
+                        style={{
+                          cursor: 'pointer',
+                          padding: '4px 12px',
+                          fontSize: 13,
+                          borderRadius: 16,
+                          borderColor: isRising ? colors.success : isDeclining ? colors.danger : scoreColor,
+                          background: isRising
+                            ? (isDark ? 'rgba(82,196,26,0.1)' : '#f6ffed')
+                            : isDeclining
+                            ? (isDark ? 'rgba(255,77,79,0.1)' : '#fff2f0')
+                            : (isDark ? 'rgba(108,99,255,0.1)' : '#f0f0ff'),
+                        }}
+                        onClick={() => {
+                          setKeyword(t.keyword);
+                          // Auto-search
+                          setTimeout(() => {
+                            const btn = document.querySelector('[data-search-btn]');
+                            if (btn) btn.click();
+                          }, 100);
+                        }}
+                      >
+                        {isRising && <RiseOutlined style={{ color: colors.success, marginRight: 4 }} />}
+                        {isDeclining && <FallOutlined style={{ color: colors.danger, marginRight: 4 }} />}
+                        {isNew && <ThunderboltOutlined style={{ color: colors.brand, marginRight: 4 }} />}
+                        {t.keyword}
+                        <span style={{
+                          fontSize: 10, marginLeft: 6, fontWeight: 700,
+                          color: scoreColor,
+                        }}>
+                          {t.fusionScore}
+                        </span>
+                      </Tag>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={<Text type="secondary">No trending data yet — snapshots will appear after the daily cron runs</Text>}
+              />
+            )}
+          </Card>
+        )}
 
         {/* Results */}
         <Card style={card}>

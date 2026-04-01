@@ -96,7 +96,7 @@ const systemJobs = {
   },
   keywordSnapshot: {
     name: 'Daily Keyword Snapshot',
-    description: 'Snapshots top 500 keywords from search history for trend tracking',
+    description: 'Snapshots 300 keywords per batch (1200+ total, rotating daily) with 5-layer data collection',
     schedule: '0 2 * * *',
     scheduleLabel: 'Daily at 2:00 AM',
     system: true,
