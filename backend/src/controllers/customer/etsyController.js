@@ -331,11 +331,54 @@ const getSyncStatus = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/customer/etsy/listings/:listingId
+ * Get a single listing's full details for audit pre-fill.
+ */
+const getListingById = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const listing = await EtsyListing.findOne({
+      shopId: shop._id,
+      etsyListingId: req.params.listingId,
+    }).lean();
+
+    if (!listing) {
+      return res.status(404).json({ success: false, message: 'Listing not found' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        listingId: listing.etsyListingId,
+        title: listing.title,
+        description: listing.description || '',
+        tags: listing.tags || [],
+        price: listing.price,
+        category: (listing.taxonomyPath || []).join(' > '),
+        taxonomyId: listing.taxonomyId,
+        images: listing.images || [],
+        views: listing.views,
+        favorites: listing.favorites,
+        state: listing.state,
+      },
+    });
+  } catch (error) {
+    log.error('Get listing by ID error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve listing' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
   getShopInfo,
   getListings,
+  getListingById,
   disconnectShop,
   syncNow,
   getSyncStatus,

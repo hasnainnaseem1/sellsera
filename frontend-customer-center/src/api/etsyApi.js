@@ -19,6 +19,9 @@ const etsyApi = {
   // Synced listings (optional shopId query param)
   getListings:   (params = {}) => axiosInstance.get('/api/v1/customer/etsy/listings', { params }).then(r => r.data),
 
+  // Single listing details (for audit pre-fill)
+  getListingById: (listingId) => axiosInstance.get(`/api/v1/customer/etsy/listings/${listingId}`).then(r => r.data),
+
   // Listing audit
   auditListing:  (data) => axiosInstance.post('/api/v1/customer/listing-audit', data).then(r => r.data),
   getAuditHistory: (params = {}) => axiosInstance.get('/api/v1/customer/listing-audit/history', { params }).then(r => r.data),

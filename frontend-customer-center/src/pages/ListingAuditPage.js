@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Row, Col, Card, Form, Input, InputNumber, Select, Button, Typography,
-  Tag, Progress, Tabs, List, Space, message, theme, Collapse,
+  Tag, Progress, Tabs, List, Space, message, theme, Collapse, Cascader,
+  Divider, Spin, Empty, Avatar,
 } from 'antd';
 import {
   SearchOutlined, ThunderboltOutlined, TagsOutlined, DollarOutlined,
   CheckCircleOutlined, CopyOutlined, ArrowLeftOutlined, RocketOutlined,
-  BulbOutlined, TrophyOutlined, FileTextOutlined,
+  BulbOutlined, TrophyOutlined, FileTextOutlined, ShopOutlined,
+  ImportOutlined,
 } from '@ant-design/icons';
 
 import AppLayout from '../components/AppLayout';
@@ -17,16 +19,10 @@ import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
 import analysisApi from '../api/analysisApi';
+import etsyApi from '../api/etsyApi';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
-
-const CATEGORIES = [
-  'Accessories', 'Art & Collectibles', 'Bags & Purses', 'Bath & Beauty',
-  'Books, Movies & Music', 'Clothing', 'Craft Supplies & Tools',
-  'Electronics & Accessories', 'Home & Living', 'Jewelry',
-  'Paper & Party Supplies', 'Pet Supplies', 'Shoes', 'Toys & Games', 'Weddings',
-];
 
 const scoreColor = (score) => {
   if (score >= 80) return colors.success;
@@ -36,7 +32,6 @@ const scoreColor = (score) => {
 
 const ListingAuditPage = () => {
   const [form] = Form.useForm();
-
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess, incrementUsage, refresh } = usePermissions();
@@ -45,25 +40,92 @@ const ListingAuditPage = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
+  // Categories (Etsy taxonomy)
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
+  // Import from shop
+  const [shopListings, setShopListings] = useState([]);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [listingSearch, setListingSearch] = useState('');
+  const [importingId, setImportingId] = useState(null);
+
   const card = {
     borderRadius: radii.lg,
     border: `1px solid ${isDark ? colors.darkBorder : colors.lightBorder}`,
     background: tok.colorBgContainer,
   };
 
+  /* ─── Fetch categories ─── */
+  useEffect(() => {
+    let mounted = true;
+    setCategoriesLoading(true);
+    etsyApi.getCategories()
+      .then(res => { if (mounted) setCategories(res.data || []); })
+      .catch(() => {})
+      .finally(() => { if (mounted) setCategoriesLoading(false); });
+    return () => { mounted = false; };
+  }, []);
+
+  /* ─── Fetch shop listings ─── */
+  const fetchListings = useCallback(async (search = '') => {
+    setListingsLoading(true);
+    try {
+      const res = await etsyApi.getListings({ search, limit: 50 });
+      setShopListings(res.data?.listings || []);
+    } catch { setShopListings([]); }
+    finally { setListingsLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchListings(); }, [fetchListings]);
+
+  /* ─── Import a listing into the form ─── */
+  const importListing = async (listing) => {
+    setImportingId(listing.listingId);
+    try {
+      const res = await etsyApi.getListingById(listing.listingId);
+      const d = res.data;
+      const catPath = d.category ? d.category.split(' > ') : [];
+      form.setFieldsValue({
+        title: d.title || '',
+        description: d.description || '',
+        tags: d.tags || [],
+        price: d.price || undefined,
+        category: catPath,
+      });
+      message.success(`Imported "${d.title?.substring(0, 40)}..."`);
+    } catch {
+      // Fallback: use the data we already have from the listing table
+      form.setFieldsValue({
+        title: listing.title || '',
+        tags: listing.tags || [],
+        price: listing.price || undefined,
+      });
+      message.info('Imported basic details (full description requires sync)');
+    } finally {
+      setImportingId(null);
+    }
+  };
+
+  /* ─── Submit ─── */
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
+      // Convert cascader array to string for backend
+      const categoryStr = Array.isArray(values.category)
+        ? values.category.join(' > ')
+        : values.category || '';
+
       const data = await analysisApi.analyze({
         title: values.title,
         description: values.description,
         tags: values.tags || [],
         price: values.price,
-        category: values.category,
+        category: categoryStr,
       });
       setResult(data);
       incrementUsage('listing_audit');
-      refresh(); // refresh usage counts
+      refresh();
       message.success('Analysis complete!');
     } catch (err) {
       const msg = err.response?.data?.message || 'Analysis failed';
@@ -308,10 +370,105 @@ const ListingAuditPage = () => {
     );
   };
 
+  /* ── Filtered shop listings ── */
+  const filteredListings = shopListings.filter(l =>
+    !listingSearch || l.title?.toLowerCase().includes(listingSearch.toLowerCase())
+  );
+
   /* ── Input Form ── */
   const AuditForm = () => (
     <Row gutter={[24, 24]}>
       <Col xs={24} lg={16}>
+        {/* Import from Shop */}
+        <Card
+          style={{ ...card, marginBottom: 24 }}
+          title={
+            <Space>
+              <ShopOutlined style={{ color: colors.brand }} />
+              <span>Import from Your Shop</span>
+            </Space>
+          }
+        >
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
+            Select a listing from your connected shop to auto-fill all details
+          </Text>
+          <Input
+            placeholder="Search your listings..."
+            prefix={<SearchOutlined style={{ color: colors.muted }} />}
+            value={listingSearch}
+            onChange={e => setListingSearch(e.target.value)}
+            allowClear
+            style={{ marginBottom: 12 }}
+          />
+          {listingsLoading ? (
+            <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
+          ) : filteredListings.length > 0 ? (
+            <div style={{ maxHeight: 240, overflowY: 'auto', overflowX: 'hidden' }}>
+              {filteredListings.map(listing => (
+                <div
+                  key={listing.listingId}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 12px', borderRadius: radii.sm, cursor: 'pointer',
+                    border: `1px solid ${isDark ? colors.darkBorder : colors.lightBorder}`,
+                    marginBottom: 8, transition: 'all 0.2s',
+                    background: tok.colorBgContainer,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = colors.brand; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? colors.darkBorder : colors.lightBorder; }}
+                  onClick={() => importListing(listing)}
+                >
+                  <Avatar
+                    shape="square" size={44}
+                    src={listing.images?.[0]?.url}
+                    icon={<ShopOutlined />}
+                    style={{ flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text strong ellipsis style={{ display: 'block', fontSize: 13 }}>
+                      {listing.title}
+                    </Text>
+                    <Space size={8} style={{ marginTop: 2 }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>${listing.price}</Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        {listing.tags?.length || 0}/13 tags
+                      </Text>
+                      <Tag
+                        color={listing.state === 'active' ? 'green' : 'default'}
+                        style={{ fontSize: 10, lineHeight: '16px' }}
+                      >
+                        {listing.state}
+                      </Tag>
+                    </Space>
+                  </div>
+                  <Button
+                    type="text" size="small"
+                    icon={<ImportOutlined />}
+                    loading={importingId === listing.listingId}
+                    style={{ color: colors.brand }}
+                  >
+                    Import
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {listingSearch ? 'No listings match your search' : 'No listings found. Sync your shop first.'}
+                </Text>
+              }
+            />
+          )}
+        </Card>
+
+        <Divider style={{ margin: '8px 0 24px' }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>OR ENTER MANUALLY</Text>
+        </Divider>
+
+        {/* Manual Form */}
         <Card style={card} title={
           <Space>
             <SearchOutlined style={{ color: colors.brand }} />
@@ -365,11 +522,17 @@ const ListingAuditPage = () => {
                   name="category" label="Category"
                   rules={[{ required: true, message: 'Category is required' }]}
                 >
-                  <Select
+                  <Cascader
+                    options={categories}
                     placeholder="Select category"
                     size="large"
-                    options={CATEGORIES.map(c => ({ value: c, label: c }))}
-                    showSearch
+                    showSearch={{
+                      filter: (input, path) =>
+                        path.some(opt => opt.label.toLowerCase().includes(input.toLowerCase())),
+                    }}
+                    changeOnSelect
+                    loading={categoriesLoading}
+                    fieldNames={{ label: 'label', value: 'label', children: 'children' }}
                   />
                 </Form.Item>
               </Col>
@@ -436,9 +599,12 @@ const ListingAuditPage = () => {
 
   return (
     <AppLayout>
-      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>Listing Audit</Title>
+          <Title level={3} style={{ margin: 0 }}>
+            <SearchOutlined style={{ marginRight: 10, color: colors.brand }} />
+            Listing Audit
+          </Title>
           <Text type="secondary">Optimize your Etsy listing for maximum visibility and sales</Text>
         </div>
         {access.state === 'unlocked' && (

@@ -24,6 +24,11 @@ router.get('/shop', etsyController.getShopInfo);
 // @access  Private — requires shop connection
 router.get('/listings', checkShopConnection, etsyController.getListings);
 
+// @route   GET /api/v1/customer/etsy/listings/:listingId
+// @desc    Get a single listing's full details (for audit pre-fill)
+// @access  Private — requires shop connection
+router.get('/listings/:listingId', checkShopConnection, etsyController.getListingById);
+
 // @route   POST /api/v1/customer/etsy/shop/:shopId/disconnect
 // @desc    Disconnect a specific Etsy shop
 // @access  Private — requires shop connection + ownership
