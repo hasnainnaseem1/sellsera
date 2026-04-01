@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Input, Button, Typography, Tag, Progress, Row, Col,
   Space, Empty, Statistic, message, theme, Table, Tooltip,
-  Select, Tabs, Modal, Spin,
+  Select, Tabs, Modal, Spin, Cascader,
 } from 'antd';
 import {
   TagsOutlined, ThunderboltOutlined, CheckCircleOutlined,
@@ -69,6 +69,10 @@ const TagAnalyzerPage = () => {
   const [listings, setListings] = useState([]);
   const [selectedListing, setSelectedListing] = useState(null);
 
+  // Categories
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
   // History
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -84,7 +88,7 @@ const TagAnalyzerPage = () => {
     background: tok.colorBgContainer,
   };
 
-  // Fetch countries + listings on mount
+  // Fetch countries + listings + categories on mount
   useEffect(() => {
     etsyApi.getCountries()
       .then(res => { if (res.success && res.data?.length) setCountries(res.data); })
@@ -95,6 +99,11 @@ const TagAnalyzerPage = () => {
         setListings(items);
       })
       .catch(() => {});
+    setCategoriesLoading(true);
+    etsyApi.getCategories()
+      .then(res => { if (res.success && res.data?.length) setCategories(res.data); })
+      .catch(() => {})
+      .finally(() => setCategoriesLoading(false));
   }, []);
 
   // ── Analyze Tags ──
@@ -362,7 +371,7 @@ const TagAnalyzerPage = () => {
                     setSelectedListing(l);
                     setTags((l.tags || []).join(', '));
                     setTitle(l.title || '');
-                    setCategory(l.taxonomyPath?.[0] || '');
+                    setCategory((l.taxonomyPath || []).join(' > '));
                   }
                 }}
                 size="large"
@@ -395,15 +404,25 @@ const TagAnalyzerPage = () => {
                   size="large"
                 />
               </Col>
-              {/* Category Input */}
+              {/* Category Cascader */}
               <Col xs={24} md={12}>
                 <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>Category (optional)</Text>
-                <Input
-                  placeholder="e.g. Jewelry, Home Decor"
-                  value={category}
-                  onChange={e => setCategory(e.target.value)}
-                  style={{ borderRadius: radii.sm, fontSize: 13 }}
+                <Cascader
+                  options={categories}
+                  value={category ? category.split(' > ') : []}
+                  onChange={(val, selectedOptions) => {
+                    setCategory(selectedOptions ? selectedOptions.map(o => o.label).join(' > ') : '');
+                  }}
+                  placeholder="Select Etsy category"
+                  showSearch={{
+                    filter: (input, path) =>
+                      path.some(opt => opt.label.toLowerCase().includes(input.toLowerCase())),
+                  }}
+                  changeOnSelect
                   size="large"
+                  style={{ width: '100%' }}
+                  loading={categoriesLoading}
+                  fieldNames={{ label: 'label', value: 'value', children: 'children' }}
                 />
               </Col>
             </Row>

@@ -31,6 +31,7 @@ const etsyApi = {
 
   // Meta
   getCountries:    () => axiosInstance.get('/api/v1/meta/countries').then(r => r.data),
+  getCategories:   () => axiosInstance.get('/api/v1/meta/categories').then(r => r.data),
 
   // Rank checker
   checkRankings:   (data) => axiosInstance.post('/api/v1/customer/rank-checker', data).then(r => r.data),
