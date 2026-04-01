@@ -287,10 +287,19 @@ const syncAllShops = async () => {
 // --- Helpers ---
 
 const mapReceiptStatus = (receipt, shipment) => {
-  if (receipt.status === 'Canceled') return 'cancelled';
-  if (shipment.delivered_date) return 'delivered';
+  // Cancelled / refunded first
+  if (receipt.status === 'Canceled' || receipt.status === 'Cancelled') return 'cancelled';
+
+  // Physical delivery confirmed
+  if (shipment.delivered_date || receipt.was_delivered) return 'delivered';
+
+  // Etsy marks order as "Completed" (digital products, or fully fulfilled)
+  if (receipt.status === 'Completed' || receipt.status === 'Complete') return 'completed';
+
+  // Physical shipment in progress
   if (shipment.tracking_code) return 'in_transit';
-  if (shipment.mail_date) return 'shipped';
+  if (shipment.mail_date || receipt.was_shipped) return 'shipped';
+
   if (receipt.is_paid) return 'paid';
   return 'paid';
 };
