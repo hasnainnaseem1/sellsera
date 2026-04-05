@@ -497,7 +497,7 @@ const createListing = async (req, res) => {
       when_made: whenMade,
       is_supply: false,
       should_auto_renew: true,
-      is_digital: !!isDigital,
+      type: isDigital ? 'download' : 'physical',
     };
 
     // Tags (max 13)
