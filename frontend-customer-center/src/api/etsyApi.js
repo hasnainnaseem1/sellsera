@@ -46,6 +46,9 @@ const etsyApi = {
   // Get shipping profiles
   getShippingProfiles: () => axiosInstance.get('/api/v1/customer/etsy/shipping-profiles').then(r => r.data),
 
+  // Publish a draft listing
+  publishListing: (listingId) => axiosInstance.put(`/api/v1/customer/etsy/listings/${listingId}/publish`).then(r => r.data),
+
   // Listing audit
   auditListing:  (data) => axiosInstance.post('/api/v1/customer/listing-audit', data).then(r => r.data),
   getAuditHistory: (params = {}) => axiosInstance.get('/api/v1/customer/listing-audit/history', { params }).then(r => r.data),

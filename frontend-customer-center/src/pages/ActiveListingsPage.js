@@ -6,7 +6,8 @@ import {
 import {
   ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
-  EyeOutlined, ExportOutlined, PlusOutlined,
+  EyeOutlined, ExportOutlined, PlusOutlined, SendOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -31,6 +32,20 @@ const ActiveListingsPage = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [publishing, setPublishing] = useState(null);
+
+  const handlePublish = async (listingId) => {
+    setPublishing(listingId);
+    try {
+      await etsyApi.publishListing(listingId);
+      message.success('Listing published successfully!');
+      fetchListings();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to publish. Ensure listing has at least one image.');
+    } finally {
+      setPublishing(null);
+    }
+  };
 
   const card = {
     borderRadius: radii.lg,
@@ -102,11 +117,16 @@ const ActiveListingsPage = () => {
       render: (p) => <Text strong style={{ color: colors.success }}>{p ? `$${p}` : '—'}</Text>,
     },
     {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 90, align: 'center',
+      title: 'Status', dataIndex: 'status', key: 'status', width: 100, align: 'center',
+      filters: [
+        { text: 'Active', value: 'active' },
+        { text: 'Draft', value: 'draft' },
+      ],
+      onFilter: (value, record) => record.status === value,
       render: (s) => (
         <Tag
-          icon={s === 'active' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
-          color={s === 'active' ? 'green' : 'default'}
+          icon={s === 'active' ? <CheckCircleOutlined /> : s === 'draft' ? <EditOutlined /> : <ExclamationCircleOutlined />}
+          color={s === 'active' ? 'green' : s === 'draft' ? 'orange' : 'default'}
           style={{ borderRadius: radii.pill }}
         >
           {s}
@@ -114,16 +134,31 @@ const ActiveListingsPage = () => {
       ),
     },
     {
-      title: '', key: 'action', width: 110, align: 'center',
-      render: (_, record) => record.listingId ? (
-        <a
-          href={`https://www.etsy.com/listing/${record.listingId}`}
-          target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 12, color: BRAND, fontWeight: 500 }}
-        >
-          <ExportOutlined style={{ marginRight: 4 }} />View on Etsy
-        </a>
-      ) : null,
+      title: '', key: 'action', width: 180, align: 'center',
+      render: (_, record) => (
+        <Space size={4}>
+          {record.status === 'draft' && (
+            <Button
+              type="primary" size="small"
+              icon={<SendOutlined />}
+              loading={publishing === record.listingId}
+              onClick={() => handlePublish(record.listingId)}
+              style={{ background: BRAND, borderColor: BRAND, borderRadius: radii.pill, fontSize: 12 }}
+            >
+              Publish
+            </Button>
+          )}
+          {record.listingId && (
+            <a
+              href={`https://www.etsy.com/listing/${record.listingId}`}
+              target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 12, color: BRAND, fontWeight: 500 }}
+            >
+              <ExportOutlined style={{ marginRight: 4 }} />View on Etsy
+            </a>
+          )}
+        </Space>
+      ),
     },
   ];
 

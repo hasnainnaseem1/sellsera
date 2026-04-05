@@ -47,7 +47,7 @@ const syncListings = async (etsyShop, jobId = null) => {
         etsyShop,
         'GET',
         `/v3/application/shops/${etsyShop.shopId}/listings`,
-        { params: { limit, offset, state: 'active' } }
+        { params: { limit, offset, state: 'active,draft' } }
       );
 
       if (!result.success) {

@@ -199,9 +199,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
 
       let response = await fetch(url, {
         method,
-        headers: options.formData
-          ? { ...baseHeaders, ...options.formData.getHeaders?.() }
-          : baseHeaders,
+        headers: baseHeaders,
         ...(fetchBody ? { body: fetchBody } : {}),
       });
 
@@ -233,9 +231,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
 
         response = await fetch(url, {
           method,
-          headers: options.formData
-            ? { ...retryHeaders, ...options.formData.getHeaders?.() }
-            : retryHeaders,
+          headers: retryHeaders,
           ...(fetchBody ? { body: fetchBody } : {}),
         });
 

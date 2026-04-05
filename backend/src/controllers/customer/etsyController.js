@@ -599,12 +599,9 @@ const uploadListingImage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No image file provided' });
     }
 
-    const FormData = require('form-data');
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
     const formData = new FormData();
-    formData.append('image', req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
-    });
+    formData.append('image', blob, req.file.originalname);
 
     const result = await etsyApi.authenticatedRequest(shop, 'POST',
       `/v3/application/shops/${shop.shopId}/listings/${listingId}/images`,
@@ -612,6 +609,7 @@ const uploadListingImage = async (req, res) => {
     );
 
     if (!result.success) {
+      log.error('Image upload failed:', result.error);
       return res.status(502).json({ success: false, message: result.error || 'Failed to upload image' });
     }
 
@@ -645,12 +643,9 @@ const uploadListingFile = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
 
-    const FormData = require('form-data');
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype || 'application/octet-stream' });
     const formData = new FormData();
-    formData.append('file', req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
-    });
+    formData.append('file', blob, req.file.originalname);
 
     const result = await etsyApi.authenticatedRequest(shop, 'POST',
       `/v3/application/shops/${shop.shopId}/listings/${listingId}/files`,
@@ -658,6 +653,7 @@ const uploadListingFile = async (req, res) => {
     );
 
     if (!result.success) {
+      log.error('File upload failed:', result.error);
       return res.status(502).json({ success: false, message: result.error || 'Failed to upload file' });
     }
 
@@ -675,6 +671,53 @@ const uploadListingFile = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/v1/customer/etsy/listings/:listingId/publish
+ * Publish a draft listing (change state to active).
+ */
+const publishListing = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+
+    const result = await etsyApi.authenticatedRequest(shop, 'PUT',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}`,
+      { body: { state: 'active' } }
+    );
+
+    if (!result.success) {
+      log.error('Publish listing failed:', result.error);
+      return res.status(502).json({
+        success: false,
+        message: result.error || 'Failed to publish listing. Make sure it has at least one image.',
+      });
+    }
+
+    // Update local DB
+    await EtsyListing.updateOne(
+      { shopId: shop._id, etsyListingId: String(listingId) },
+      { $set: { state: 'active' } }
+    ).catch(() => {});
+
+    return res.json({
+      success: true,
+      message: 'Listing published successfully',
+      data: {
+        listingId: result.data?.listing_id || listingId,
+        state: 'active',
+        url: `https://www.etsy.com/listing/${listingId}`,
+      },
+    });
+  } catch (error) {
+    log.error('Publish listing error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to publish listing' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
@@ -688,4 +731,5 @@ module.exports = {
   createListing,
   uploadListingImage,
   uploadListingFile,
+  publishListing,
 };

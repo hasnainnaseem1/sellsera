@@ -75,4 +75,9 @@ router.post('/listings/:listingId/images', checkShopConnection, upload.single('i
 // @access  Private — requires shop connection
 router.post('/listings/:listingId/files', checkShopConnection, upload.single('file'), etsyController.uploadListingFile);
 
+// @route   PUT /api/v1/customer/etsy/listings/:listingId/publish
+// @desc    Publish a draft listing (state → active)
+// @access  Private — requires shop connection
+router.put('/listings/:listingId/publish', checkShopConnection, etsyController.publishListing);
+
 module.exports = router;
