@@ -122,7 +122,8 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
   // Submit → create listing, then upload files
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
+      // Get all field values including unmounted steps
+      const values = form.getFieldsValue(true);
       setLoading(true);
 
       // Get taxonomy ID from last selected category value
