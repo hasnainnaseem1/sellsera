@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Row, Col, Card, Form, Input, InputNumber, Select, Button, Typography,
   Tag, Progress, Tabs, List, Space, message, theme, Collapse, Cascader,
-  Divider, Spin, Empty, Avatar,
+  Spin, Avatar,
 } from 'antd';
 import {
   SearchOutlined, ThunderboltOutlined, TagsOutlined, DollarOutlined,
   CheckCircleOutlined, CopyOutlined, ArrowLeftOutlined, RocketOutlined,
   BulbOutlined, TrophyOutlined, FileTextOutlined, ShopOutlined,
-  ImportOutlined,
+  ImportOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 
 import AppLayout from '../components/AppLayout';
@@ -47,8 +47,6 @@ const ListingAuditPage = () => {
   // Import from shop
   const [shopListings, setShopListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
-  const [listingSearch, setListingSearch] = useState('');
-  const [importingId, setImportingId] = useState(null);
 
   const card = {
     borderRadius: radii.lg,
@@ -81,7 +79,6 @@ const ListingAuditPage = () => {
 
   /* ─── Import a listing into the form ─── */
   const importListing = async (listing) => {
-    setImportingId(listing.listingId);
     try {
       const res = await etsyApi.getListingById(listing.listingId);
       const d = res.data;
@@ -102,8 +99,6 @@ const ListingAuditPage = () => {
         price: listing.price || undefined,
       });
       message.info('Imported basic details (full description requires sync)');
-    } finally {
-      setImportingId(null);
     }
   };
 
@@ -370,111 +365,88 @@ const ListingAuditPage = () => {
     );
   };
 
-  /* ── Filtered shop listings ── */
-  const filteredListings = shopListings.filter(l =>
-    !listingSearch || l.title?.toLowerCase().includes(listingSearch.toLowerCase())
-  );
-
   /* ── Input Form ── */
   const AuditForm = () => (
     <Row gutter={[24, 24]}>
       <Col xs={24} lg={16}>
-        {/* Import from Shop */}
-        <Card
-          style={{ ...card, marginBottom: 24 }}
-          title={
-            <Space>
-              <ShopOutlined style={{ color: colors.brand }} />
-              <span>Import from Your Shop</span>
-            </Space>
-          }
-        >
-          <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-            Select a listing from your connected shop to auto-fill all details
-          </Text>
-          <Input
-            placeholder="Search your listings..."
-            prefix={<SearchOutlined style={{ color: colors.muted }} />}
-            value={listingSearch}
-            onChange={e => setListingSearch(e.target.value)}
-            allowClear
-            style={{ marginBottom: 12 }}
-          />
-          {listingsLoading ? (
-            <div style={{ textAlign: 'center', padding: 24 }}><Spin /></div>
-          ) : filteredListings.length > 0 ? (
-            <div style={{ maxHeight: 240, overflowY: 'auto', overflowX: 'hidden' }}>
-              {filteredListings.map(listing => (
-                <div
-                  key={listing.listingId}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '10px 12px', borderRadius: radii.sm, cursor: 'pointer',
-                    border: `1px solid ${isDark ? colors.darkBorder : colors.lightBorder}`,
-                    marginBottom: 8, transition: 'all 0.2s',
-                    background: tok.colorBgContainer,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = colors.brand; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? colors.darkBorder : colors.lightBorder; }}
-                  onClick={() => importListing(listing)}
-                >
-                  <Avatar
-                    shape="square" size={44}
-                    src={listing.images?.[0]?.url}
-                    icon={<ShopOutlined />}
-                    style={{ flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <Text strong ellipsis style={{ display: 'block', fontSize: 13 }}>
-                      {listing.title}
-                    </Text>
-                    <Space size={8} style={{ marginTop: 2 }}>
-                      <Text type="secondary" style={{ fontSize: 11 }}>${listing.price}</Text>
-                      <Text type="secondary" style={{ fontSize: 11 }}>
-                        {listing.tags?.length || 0}/13 tags
-                      </Text>
-                      <Tag
-                        color={listing.state === 'active' ? 'green' : 'default'}
-                        style={{ fontSize: 10, lineHeight: '16px' }}
-                      >
-                        {listing.state}
-                      </Tag>
-                    </Space>
-                  </div>
-                  <Button
-                    type="text" size="small"
-                    icon={<ImportOutlined />}
-                    loading={importingId === listing.listingId}
-                    style={{ color: colors.brand }}
-                  >
-                    Import
-                  </Button>
-                </div>
-              ))}
+        <Card style={card}>
+          {/* ─ Quick Import Strip ─ */}
+          <div style={{
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(108,99,255,0.10), rgba(108,99,255,0.04))'
+              : 'linear-gradient(135deg, rgba(108,99,255,0.06), rgba(108,99,255,0.02))',
+            border: `1px solid ${isDark ? 'rgba(108,99,255,0.18)' : 'rgba(108,99,255,0.12)'}`,
+            borderRadius: radii.sm, padding: '14px 18px', marginBottom: 28,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: `linear-gradient(135deg, ${colors.brand}, ${colors.brandLight})`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <DownloadOutlined style={{ color: '#fff', fontSize: 13 }} />
+              </div>
+              <Text strong style={{ fontSize: 14 }}>Quick Import</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>— select a listing to auto-fill all fields</Text>
             </div>
-          ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {listingSearch ? 'No listings match your search' : 'No listings found. Sync your shop first.'}
-                </Text>
+            <Select
+              showSearch
+              placeholder="Search your shop listings..."
+              size="large"
+              style={{ width: '100%' }}
+              loading={listingsLoading}
+              filterOption={(input, option) =>
+                option?.title?.toLowerCase().includes(input.toLowerCase())
               }
-            />
-          )}
-        </Card>
+              notFoundContent={listingsLoading ? <Spin size="small" /> : 'No listings found'}
+              onChange={(listingId) => {
+                const listing = shopListings.find(l => String(l.listingId) === String(listingId));
+                if (listing) importListing(listing);
+              }}
+              optionLabelProp="title"
+              value={null}
+            >
+              {shopListings.map(listing => (
+                <Select.Option
+                  key={listing.listingId}
+                  value={listing.listingId}
+                  title={listing.title}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+                    <Avatar
+                      shape="square" size={36}
+                      src={listing.images?.[0]?.url}
+                      icon={<ShopOutlined />}
+                      style={{ flexShrink: 0, borderRadius: 6 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontWeight: 600, fontSize: 13,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {listing.title}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 1 }}>
+                        <span style={{ fontSize: 11, color: tok.colorTextSecondary }}>${listing.price}</span>
+                        <span style={{ fontSize: 11, color: tok.colorTextSecondary }}>
+                          {listing.tags?.length || 0}/13 tags
+                        </span>
+                        <Tag
+                          color={listing.state === 'active' ? 'green' : 'default'}
+                          style={{ fontSize: 10, lineHeight: '16px', margin: 0 }}
+                        >
+                          {listing.state}
+                        </Tag>
+                      </div>
+                    </div>
+                    <ImportOutlined style={{ color: colors.brand, fontSize: 14 }} />
+                  </div>
+                </Select.Option>
+              ))}
+            </Select>
+          </div>
 
-        <Divider style={{ margin: '8px 0 24px' }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>OR ENTER MANUALLY</Text>
-        </Divider>
-
-        {/* Manual Form */}
-        <Card style={card} title={
-          <Space>
-            <SearchOutlined style={{ color: colors.brand }} />
-            <span>Listing Details</span>
-          </Space>
-        }>
+          {/* ─ Form ─ */}
           <Form
             form={form}
             layout="vertical"
