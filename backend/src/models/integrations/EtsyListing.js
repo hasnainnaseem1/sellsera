@@ -97,6 +97,12 @@ const etsyListingSchema = new mongoose.Schema({
     rank: { type: Number }
   }],
 
+  // Listing type
+  isDigital: {
+    type: Boolean,
+    default: false
+  },
+
   // Shop attributes relevant to audit scoring
   shippingProfile: {
     freeShipping: { type: Boolean, default: false },

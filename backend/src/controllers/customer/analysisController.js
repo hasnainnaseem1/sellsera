@@ -716,11 +716,21 @@ function generateActionItems(titleScore, tagsScore, descScore, imageScore, price
 
   // Image action
   if (imageScore.score < 70) {
-    items.push({
-      priority: 'high',
-      action: `Add more images (currently ${imageScore.details.imageCount}/10). Include lifestyle, detail, and scale shots`,
-      impact: 'Listings with 10 images get 2x more views',
-    });
+    if (isDigital) {
+      items.push({
+        priority: imageScore.details.imageCount === 0 ? 'high' : 'medium',
+        action: imageScore.details.imageCount === 0
+          ? 'Add preview images showing what buyers will receive — mockups, sample pages, or screenshots'
+          : `Add more preview images (currently ${imageScore.details.imageCount}/10). Show mockups, sample pages, and what the digital file looks like`,
+        impact: 'Listings with 10 images get 2x more views — preview images build buyer confidence for digital products',
+      });
+    } else {
+      items.push({
+        priority: 'high',
+        action: `Add more images (currently ${imageScore.details.imageCount}/10). Include lifestyle, detail, and scale shots`,
+        impact: 'Listings with 10 images get 2x more views',
+      });
+    }
   }
 
   // Price action — calculative with specific dollar amounts
@@ -747,17 +757,36 @@ function generateActionItems(titleScore, tagsScore, descScore, imageScore, price
     }
   }
 
-  // Category action
+  // Category action — specific feedback
   if (categoryScore.score < 60) {
-    items.push({
-      priority: 'medium',
-      action: 'Ensure your category matches your listing — add category keywords to title and tags',
-      impact: 'Accurate categorization improves search placement',
-    });
+    const catDetails = categoryScore.details || {};
+    const catWords = catDetails.categoryWords || [];
+    const matchedWords = catDetails.matchedWords || [];
+    const unmatchedWords = catWords.filter(w => !matchedWords.includes(w));
+
+    if (unmatchedWords.length > 0 && matchedWords.length > 0) {
+      items.push({
+        priority: 'medium',
+        action: `Your category ("${category}") partially matches your listing. Add these category keywords to your title or tags: ${unmatchedWords.slice(0, 4).map(w => `"${w}"`).join(', ')}`,
+        impact: 'Accurate categorization improves search placement — matching keywords help Etsy rank you correctly',
+      });
+    } else if (matchedWords.length === 0) {
+      items.push({
+        priority: 'high',
+        action: `Your category ("${category}") doesn't match your listing keywords. Either add category-related terms to your title/tags, or recategorize into a category that better fits your product`,
+        impact: 'Mismatched category means Etsy may show your listing to the wrong audience — this hurts both ranking and conversion',
+      });
+    } else {
+      items.push({
+        priority: 'medium',
+        action: 'Ensure your category matches your listing — add category keywords to title and tags',
+        impact: 'Accurate categorization improves search placement',
+      });
+    }
   }
 
-  // Shop attribute actions
-  if (!shopAttrScore.details.freeShipping) {
+  // Shop attribute actions — skip shipping for digital products
+  if (!isDigital && !shopAttrScore.details.freeShipping) {
     items.push({
       priority: 'medium',
       action: 'Enable free shipping — Etsy boosts listings with free shipping in search results',
@@ -796,7 +825,7 @@ const analyzeListing = async (req, res) => {
   try {
     const {
       title, description, tags, price, category,
-      imageCount, freeShipping, processingDays, returnsAccepted,
+      imageCount, freeShipping, processingDays, returnsAccepted, isDigital,
     } = req.body;
 
     // Validation
@@ -869,7 +898,7 @@ const analyzeListing = async (req, res) => {
     const descSuggestion  = generateDescriptionSuggestion(description, listingTags, descResult, competitors);
     const actionItems     = generateActionItems(
       titleResult, tagsResult, descResult, imageResult, priceResult, catResult, shopAttrResult,
-      competitors, listingTags, competitorAvg, listingPrice
+      competitors, listingTags, competitorAvg, listingPrice, !!isDigital, category
     );
 
     // --- Calculative Pricing Recommendation ---

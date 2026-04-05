@@ -90,6 +90,7 @@ const syncListings = async (etsyShop, jobId = null) => {
             taxonomyId: listing.taxonomy_id || null,
             taxonomyPath: listing.category_path || [],
             images: [], // Images fetched separately if needed
+            isDigital: listing.is_digital || false,
             shippingProfile: listing.shipping_profile_id ? String(listing.shipping_profile_id) : null,
             processingMin: listing.processing_min || null,
             processingMax: listing.processing_max || null,

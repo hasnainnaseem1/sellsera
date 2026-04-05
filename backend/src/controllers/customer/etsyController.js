@@ -14,6 +14,7 @@ const { EtsyShop, EtsyListing, EtsyOAuthState } = require('../../models/integrat
 const { Plan } = require('../../models/subscription');
 const oauthService = require('../../services/etsy/oauthService');
 const shopSyncService = require('../../services/etsy/shopSyncService');
+const etsyApi = require('../../services/etsy/etsyApiService');
 const log = require('../../utils/logger')('EtsyCtrl');
 
 /**
@@ -351,6 +352,37 @@ const getListingById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Listing not found' });
     }
 
+    // Fetch fresh data from Etsy API for images, is_digital, etc.
+    let liveImages = listing.images || [];
+    let isDigital = listing.isDigital || false;
+    let shippingProfile = listing.shippingProfile || {};
+    let returnsAccepted = listing.returnsAccepted || false;
+
+    try {
+      const liveResult = await etsyApi.publicRequest('GET',
+        `/v3/application/listings/${listing.etsyListingId}`,
+        { params: { includes: 'Images' } }
+      );
+      if (liveResult.success && liveResult.data) {
+        const ld = liveResult.data;
+        // Extract images
+        if (ld.images && ld.images.length > 0) {
+          liveImages = ld.images.map(img => ({
+            url: img.url_570xN || img.url_fullxfull || img.url_170x135 || '',
+            rank: img.rank || 0,
+          }));
+        }
+        // Digital status
+        if (ld.is_digital !== undefined) isDigital = ld.is_digital;
+        // Shipping & returns
+        if (ld.is_digital) {
+          shippingProfile = { freeShipping: true, processingDays: null };
+        }
+      }
+    } catch (apiErr) {
+      log.warn('Live listing fetch failed, using cached data:', apiErr.message);
+    }
+
     return res.json({
       success: true,
       data: {
@@ -361,7 +393,10 @@ const getListingById = async (req, res) => {
         price: listing.price,
         category: (listing.taxonomyPath || []).join(' > '),
         taxonomyId: listing.taxonomyId,
-        images: listing.images || [],
+        images: liveImages,
+        isDigital,
+        shippingProfile,
+        returnsAccepted,
         views: listing.views,
         favorites: listing.favorites,
         state: listing.state,

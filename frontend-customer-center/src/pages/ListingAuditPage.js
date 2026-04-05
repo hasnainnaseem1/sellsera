@@ -93,6 +93,7 @@ const ListingAuditPage = () => {
       });
       setImportedMeta({
         imageCount: d.images?.length || d.imageCount || 0,
+        isDigital: d.isDigital || d.is_digital || false,
         freeShipping: d.shippingProfile?.freeShipping || d.freeShipping || false,
         processingDays: d.shippingProfile?.processingDays || d.processingDays || null,
         returnsAccepted: d.returnsAccepted || false,
