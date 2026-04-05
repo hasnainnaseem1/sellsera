@@ -78,6 +78,7 @@ const ListingAuditPage = () => {
   useEffect(() => { fetchListings(); }, [fetchListings]);
 
   /* ─── Import a listing into the form ─── */
+  const [importedMeta, setImportedMeta] = useState(null);
   const importListing = async (listing) => {
     try {
       const res = await etsyApi.getListingById(listing.listingId);
@@ -90,6 +91,12 @@ const ListingAuditPage = () => {
         price: d.price || undefined,
         category: catPath,
       });
+      setImportedMeta({
+        imageCount: d.images?.length || d.imageCount || 0,
+        freeShipping: d.shippingProfile?.freeShipping || d.freeShipping || false,
+        processingDays: d.shippingProfile?.processingDays || d.processingDays || null,
+        returnsAccepted: d.returnsAccepted || false,
+      });
       message.success(`Imported "${d.title?.substring(0, 40)}..."`);
     } catch {
       // Fallback: use the data we already have from the listing table
@@ -98,6 +105,7 @@ const ListingAuditPage = () => {
         tags: listing.tags || [],
         price: listing.price || undefined,
       });
+      setImportedMeta(null);
       message.info('Imported basic details (full description requires sync)');
     }
   };
@@ -117,6 +125,7 @@ const ListingAuditPage = () => {
         tags: values.tags || [],
         price: values.price,
         category: categoryStr,
+        ...(importedMeta || {}),
       });
       setResult(data);
       incrementUsage('listing_audit');
