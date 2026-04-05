@@ -22,6 +22,30 @@ const etsyApi = {
   // Single listing details (for audit pre-fill)
   getListingById: (listingId) => axiosInstance.get(`/api/v1/customer/etsy/listings/${listingId}`).then(r => r.data),
 
+  // Create listing on Etsy
+  createListing:  (data) => axiosInstance.post('/api/v1/customer/etsy/listings', data).then(r => r.data),
+
+  // Upload image to a listing
+  uploadListingImage: (listingId, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return axiosInstance.post(`/api/v1/customer/etsy/listings/${listingId}/images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+
+  // Upload digital file to a listing
+  uploadListingFile: (listingId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosInstance.post(`/api/v1/customer/etsy/listings/${listingId}/files`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+
+  // Get shipping profiles
+  getShippingProfiles: () => axiosInstance.get('/api/v1/customer/etsy/shipping-profiles').then(r => r.data),
+
   // Listing audit
   auditListing:  (data) => axiosInstance.post('/api/v1/customer/listing-audit', data).then(r => r.data),
   getAuditHistory: (params = {}) => axiosInstance.get('/api/v1/customer/listing-audit/history', { params }).then(r => r.data),

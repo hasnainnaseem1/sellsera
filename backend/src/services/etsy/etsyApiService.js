@@ -180,14 +180,29 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
 
       const url = buildUrl(path, options.params);
 
+      // Build headers — skip Content-Type for formData (let fetch set multipart boundary)
+      const baseHeaders = {
+        'x-api-key': apiKeyHeader,
+        'Authorization': `Bearer ${currentAccessToken}`,
+      };
+      if (!options.formData) {
+        baseHeaders['Content-Type'] = 'application/json';
+      }
+
+      // Build body
+      let fetchBody;
+      if (options.formData) {
+        fetchBody = options.formData;
+      } else if (options.body) {
+        fetchBody = JSON.stringify(options.body);
+      }
+
       let response = await fetch(url, {
         method,
-        headers: {
-          'x-api-key': apiKeyHeader,
-          'Authorization': `Bearer ${currentAccessToken}`,
-          'Content-Type': 'application/json',
-        },
-        ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+        headers: options.formData
+          ? { ...baseHeaders, ...options.formData.getHeaders?.() }
+          : baseHeaders,
+        ...(fetchBody ? { body: fetchBody } : {}),
       });
 
       log.info(`authRequest: ${method} ${path} → HTTP ${response.status} ${response.statusText}`);
@@ -208,14 +223,20 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
         currentAccessToken = refreshResult.accessToken;
         await rateLimiter.acquire();
 
+        const retryHeaders = {
+          'x-api-key': apiKeyHeader,
+          'Authorization': `Bearer ${currentAccessToken}`,
+        };
+        if (!options.formData) {
+          retryHeaders['Content-Type'] = 'application/json';
+        }
+
         response = await fetch(url, {
           method,
-          headers: {
-            'x-api-key': apiKeyHeader,
-            'Authorization': `Bearer ${currentAccessToken}`,
-            'Content-Type': 'application/json',
-          },
-          ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+          headers: options.formData
+            ? { ...retryHeaders, ...options.formData.getHeaders?.() }
+            : retryHeaders,
+          ...(fetchBody ? { body: fetchBody } : {}),
         });
 
         if (response.status === 401) {

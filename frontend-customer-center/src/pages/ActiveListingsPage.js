@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Typography, Tag, Row, Col, Statistic,
-  Button, theme, Input, message, Empty, Spin,
+  Button, theme, Input, message, Empty, Spin, Space,
 } from 'antd';
 import {
   ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
-  EyeOutlined, ExportOutlined,
+  EyeOutlined, ExportOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
 import QuotaBanner from '../components/common/QuotaBanner';
 import UsageBadge from '../components/common/UsageBadge';
+import CreateListingModal from '../components/CreateListingModal';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
@@ -29,6 +30,7 @@ const ActiveListingsPage = () => {
   const [listings, setListings] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const card = {
     borderRadius: radii.lg,
@@ -170,9 +172,19 @@ const ActiveListingsPage = () => {
               onChange={e => setSearch(e.target.value)}
               style={{ width: 280, borderRadius: radii.sm }}
             />
-            <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchListings}>
-              Sync
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setCreateOpen(true)}
+                style={{ background: BRAND, borderColor: BRAND, borderRadius: radii.sm }}
+              >
+                Create Listing
+              </Button>
+              <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchListings}>
+                Sync
+              </Button>
+            </Space>
           </div>
           {loading ? (
             <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
@@ -188,6 +200,12 @@ const ActiveListingsPage = () => {
           )}
         </Card>
       </FeatureGate>
+
+      <CreateListingModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={() => { setCreateOpen(false); fetchListings(); }}
+      />
     </AppLayout>
   );
 };

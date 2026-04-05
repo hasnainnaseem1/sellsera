@@ -1,8 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const etsyController = require('../../../controllers/customer/etsyController');
 const { checkShopConnection } = require('../../../middleware/etsy');
 const { checkShopLimit } = require('../../../middleware/subscription');
+
+// Multer config for file uploads (in-memory, max 20MB)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 // @route   GET /api/v1/customer/etsy/auth
 // @desc    Initiate Etsy OAuth flow (returns auth URL)
@@ -47,5 +54,25 @@ router.get('/sync-status/:jobId', etsyController.getSyncStatus);
 // Legacy routes (backward compatible — operate on first active shop)
 router.post('/disconnect', checkShopConnection, etsyController.disconnectShop);
 router.post('/sync', checkShopConnection, etsyController.syncNow);
+
+// @route   GET /api/v1/customer/etsy/shipping-profiles
+// @desc    Get the user's Etsy shipping profile templates
+// @access  Private — requires shop connection
+router.get('/shipping-profiles', checkShopConnection, etsyController.getShippingProfiles);
+
+// @route   POST /api/v1/customer/etsy/listings
+// @desc    Create a new listing on Etsy
+// @access  Private — requires shop connection
+router.post('/listings', checkShopConnection, etsyController.createListing);
+
+// @route   POST /api/v1/customer/etsy/listings/:listingId/images
+// @desc    Upload an image to an Etsy listing
+// @access  Private — requires shop connection
+router.post('/listings/:listingId/images', checkShopConnection, upload.single('image'), etsyController.uploadListingImage);
+
+// @route   POST /api/v1/customer/etsy/listings/:listingId/files
+// @desc    Upload a digital file to an Etsy listing
+// @access  Private — requires shop connection
+router.post('/listings/:listingId/files', checkShopConnection, upload.single('file'), etsyController.uploadListingFile);
 
 module.exports = router;

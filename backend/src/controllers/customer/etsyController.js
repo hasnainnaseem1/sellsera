@@ -414,6 +414,267 @@ const getListingById = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/customer/etsy/shipping-profiles
+ * Fetch the user's shipping profile templates from Etsy.
+ */
+const getShippingProfiles = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const result = await etsyApi.authenticatedRequest(shop, 'GET',
+      `/v3/application/shops/${shop.shopId}/shipping-profiles`
+    );
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: 'Failed to fetch shipping profiles from Etsy' });
+    }
+
+    const profiles = (result.data?.results || []).map(p => ({
+      shippingProfileId: p.shipping_profile_id,
+      title: p.title,
+      processingMin: p.processing_min,
+      processingMax: p.processing_max,
+      originCountryIso: p.origin_country_iso,
+    }));
+
+    return res.json({ success: true, data: profiles });
+  } catch (error) {
+    log.error('Get shipping profiles error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve shipping profiles' });
+  }
+};
+
+/**
+ * POST /api/v1/customer/etsy/listings
+ * Create a new listing on Etsy.
+ * 
+ * Required body fields: title, description, price, quantity, taxonomyId,
+ *   whoMade, whenMade, isDigital
+ * Physical-only: shippingProfileId
+ * Optional: tags[], materials[], personalizationIsRequired, personalizationInstructions
+ */
+const createListing = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const {
+      title, description, price, quantity, taxonomyId,
+      whoMade, whenMade, isDigital,
+      shippingProfileId, tags, materials,
+      personalizationIsRequired, personalizationInstructions,
+    } = req.body;
+
+    // Validation
+    if (!title || !description || !price || !quantity || !taxonomyId || !whoMade || !whenMade) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: title, description, price, quantity, category, who made, when made',
+      });
+    }
+
+    if (!isDigital && !shippingProfileId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Physical products require a shipping profile',
+      });
+    }
+
+    // Build Etsy API payload
+    const body = {
+      title: title.trim(),
+      description: description.trim(),
+      price: parseFloat(price),
+      quantity: parseInt(quantity, 10),
+      taxonomy_id: parseInt(taxonomyId, 10),
+      who_made: whoMade,
+      when_made: whenMade,
+      is_supply: false,
+      should_auto_renew: true,
+      is_digital: !!isDigital,
+    };
+
+    // Tags (max 13)
+    if (tags && tags.length > 0) {
+      body.tags = tags.slice(0, 13).map(t => t.trim()).filter(Boolean);
+    }
+
+    // Materials
+    if (materials && materials.length > 0) {
+      body.materials = materials.slice(0, 13).map(m => m.trim()).filter(Boolean);
+    }
+
+    // Shipping profile for physical products
+    if (!isDigital && shippingProfileId) {
+      body.shipping_profile_id = parseInt(shippingProfileId, 10);
+    }
+
+    // Personalization
+    if (personalizationIsRequired) {
+      body.is_personalizable = true;
+      body.personalization_is_required = true;
+      if (personalizationInstructions) {
+        body.personalization_instructions = personalizationInstructions.trim();
+      }
+    }
+
+    log.info(`Creating listing on Etsy: "${title.substring(0, 50)}..." for shop ${shop.shopId}`);
+
+    const result = await etsyApi.authenticatedRequest(shop, 'POST',
+      `/v3/application/shops/${shop.shopId}/listings`,
+      { body }
+    );
+
+    if (!result.success) {
+      log.error('Etsy create listing failed:', result.error);
+      return res.status(502).json({
+        success: false,
+        message: result.error || 'Failed to create listing on Etsy',
+      });
+    }
+
+    const created = result.data;
+
+    // Save to local DB
+    try {
+      await EtsyListing.create({
+        shopId: shop._id,
+        etsyListingId: String(created.listing_id),
+        title: created.title || title,
+        description: created.description || description,
+        tags: created.tags || tags || [],
+        materials: created.materials || materials || [],
+        price: created.price?.amount ? created.price.amount / created.price.divisor : parseFloat(price),
+        currencyCode: created.price?.currency_code || 'USD',
+        quantity: created.quantity || parseInt(quantity, 10),
+        views: 0,
+        favorites: 0,
+        state: created.state || 'draft',
+        taxonomyId: created.taxonomy_id || parseInt(taxonomyId, 10),
+        taxonomyPath: [],
+        isDigital: !!isDigital,
+        syncedAt: new Date(),
+      });
+    } catch (dbErr) {
+      log.warn('Failed to save created listing to local DB:', dbErr.message);
+    }
+
+    log.info(`Listing created: ${created.listing_id}`);
+
+    return res.json({
+      success: true,
+      message: 'Listing created successfully on Etsy',
+      data: {
+        listingId: created.listing_id,
+        title: created.title,
+        state: created.state,
+        url: `https://www.etsy.com/listing/${created.listing_id}`,
+      },
+    });
+  } catch (error) {
+    log.error('Create listing error:', error.message, error.stack);
+    return res.status(500).json({ success: false, message: 'Failed to create listing' });
+  }
+};
+
+/**
+ * POST /api/v1/customer/etsy/listings/:listingId/images
+ * Upload an image to an existing Etsy listing.
+ */
+const uploadListingImage = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file provided' });
+    }
+
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('image', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+
+    const result = await etsyApi.authenticatedRequest(shop, 'POST',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/images`,
+      { formData }
+    );
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: result.error || 'Failed to upload image' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Image uploaded successfully',
+      data: {
+        listingImageId: result.data?.listing_image_id,
+        url: result.data?.url_570xN || result.data?.url_fullxfull || '',
+      },
+    });
+  } catch (error) {
+    log.error('Upload listing image error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to upload image' });
+  }
+};
+
+/**
+ * POST /api/v1/customer/etsy/listings/:listingId/files
+ * Upload a digital file to an existing Etsy listing.
+ */
+const uploadListingFile = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file provided' });
+    }
+
+    const FormData = require('form-data');
+    const formData = new FormData();
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+
+    const result = await etsyApi.authenticatedRequest(shop, 'POST',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/files`,
+      { formData }
+    );
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: result.error || 'Failed to upload file' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Digital file uploaded successfully',
+      data: {
+        fileId: result.data?.listing_file_id,
+        filename: result.data?.filename || req.file.originalname,
+      },
+    });
+  } catch (error) {
+    log.error('Upload listing file error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to upload digital file' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
@@ -423,4 +684,8 @@ module.exports = {
   disconnectShop,
   syncNow,
   getSyncStatus,
+  getShippingProfiles,
+  createListing,
+  uploadListingImage,
+  uploadListingFile,
 };
