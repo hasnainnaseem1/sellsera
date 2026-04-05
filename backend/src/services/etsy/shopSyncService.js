@@ -35,81 +35,88 @@ const syncListings = async (etsyShop, jobId = null) => {
     etsyShop.status = 'syncing';
     await etsyShop.save();
 
-    let offset = 0;
     const limit = 100;
     let totalSynced = 0;
-    let hasMore = true;
+    const syncedEtsyIds = []; // Track which listing IDs still exist on Etsy
 
-    while (hasMore) {
-      log.info(`Fetching listings for shop ${etsyShop.shopId} (offset: ${offset})`);
+    // Etsy API only accepts a single state enum value, so fetch active and draft separately
+    const statesToSync = ['active', 'draft'];
 
-      const result = await etsyApi.authenticatedRequest(
-        etsyShop,
-        'GET',
-        `/v3/application/shops/${etsyShop.shopId}/listings`,
-        { params: { limit, offset, state: 'active,draft' } }
-      );
+    for (const listingState of statesToSync) {
+      let offset = 0;
+      let hasMore = true;
 
-      if (!result.success) {
-        log.error(`API call failed for shop ${etsyShop.shopId}:`, result.error, result.code);
-        // If token was revoked during sync, stop
-        if (result.code === 'SHOP_TOKEN_REVOKED') {
-          return { success: false, syncedCount: totalSynced, error: 'Token revoked during sync' };
-        }
-        break;
-      }
+      while (hasMore) {
+        log.info(`Fetching ${listingState} listings for shop ${etsyShop.shopId} (offset: ${offset})`);
 
-      log.info(`Got ${result.data?.results?.length || 0} listings (count: ${result.data?.count})`);
-
-      // Report total estimate on first page
-      if (offset === 0 && jobId) {
-        syncJobManager.updateProgress(jobId, {
-          totalEstimate: result.data?.count || 0,
-          phase: 'listings',
-        });
-      }
-
-      const listings = result.data.results || [];
-
-      for (const listing of listings) {
-        await EtsyListing.findOneAndUpdate(
-          { shopId: etsyShop._id, etsyListingId: String(listing.listing_id) },
-          {
-            shopId: etsyShop._id,
-            etsyListingId: String(listing.listing_id),
-            title: listing.title || '',
-            description: listing.description || '',
-            tags: listing.tags || [],
-            materials: listing.materials || [],
-            price: listing.price?.amount ? listing.price.amount / listing.price.divisor : 0,
-            currencyCode: listing.price?.currency_code || 'USD',
-            quantity: listing.quantity || 0,
-            views: listing.views || 0,
-            favorites: listing.num_favorers || 0,
-            state: listing.state || 'active',
-            taxonomyId: listing.taxonomy_id || null,
-            taxonomyPath: listing.category_path || [],
-            images: [], // Images fetched separately if needed
-            isDigital: listing.is_digital || false,
-            shippingProfile: listing.shipping_profile_id ? String(listing.shipping_profile_id) : null,
-            processingMin: listing.processing_min || null,
-            processingMax: listing.processing_max || null,
-            returnsAccepted: listing.has_variations || false,
-            syncedAt: new Date(),
-          },
-          { upsert: true, new: true }
+        const result = await etsyApi.authenticatedRequest(
+          etsyShop,
+          'GET',
+          `/v3/application/shops/${etsyShop.shopId}/listings`,
+          { params: { limit, offset, state: listingState } }
         );
-        totalSynced++;
-        syncedEtsyIds.push(String(listing.listing_id));
-      }
 
-      // Report progress after each page
-      if (jobId) {
-        syncJobManager.updateProgress(jobId, { syncedCount: totalSynced });
-      }
+        if (!result.success) {
+          log.error(`API call failed for shop ${etsyShop.shopId} (state: ${listingState}):`, result.error, result.code);
+          // If token was revoked during sync, stop
+          if (result.code === 'SHOP_TOKEN_REVOKED') {
+            return { success: false, syncedCount: totalSynced, error: 'Token revoked during sync' };
+          }
+          break;
+        }
 
-      hasMore = listings.length === limit;
-      offset += limit;
+        log.info(`Got ${result.data?.results?.length || 0} ${listingState} listings (count: ${result.data?.count})`);
+
+        // Report total estimate on first page of active listings
+        if (offset === 0 && listingState === 'active' && jobId) {
+          syncJobManager.updateProgress(jobId, {
+            totalEstimate: result.data?.count || 0,
+            phase: 'listings',
+          });
+        }
+
+        const listings = result.data.results || [];
+
+        for (const listing of listings) {
+          await EtsyListing.findOneAndUpdate(
+            { shopId: etsyShop._id, etsyListingId: String(listing.listing_id) },
+            {
+              shopId: etsyShop._id,
+              etsyListingId: String(listing.listing_id),
+              title: listing.title || '',
+              description: listing.description || '',
+              tags: listing.tags || [],
+              materials: listing.materials || [],
+              price: listing.price?.amount ? listing.price.amount / listing.price.divisor : 0,
+              currencyCode: listing.price?.currency_code || 'USD',
+              quantity: listing.quantity || 0,
+              views: listing.views || 0,
+              favorites: listing.num_favorers || 0,
+              state: listing.state || 'active',
+              taxonomyId: listing.taxonomy_id || null,
+              taxonomyPath: listing.category_path || [],
+              images: [], // Images fetched separately if needed
+              isDigital: listing.is_digital || false,
+              shippingProfile: listing.shipping_profile_id ? String(listing.shipping_profile_id) : null,
+              processingMin: listing.processing_min || null,
+              processingMax: listing.processing_max || null,
+              returnsAccepted: listing.has_variations || false,
+              syncedAt: new Date(),
+            },
+            { upsert: true, new: true }
+          );
+          totalSynced++;
+          syncedEtsyIds.push(String(listing.listing_id));
+        }
+
+        // Report progress after each page
+        if (jobId) {
+          syncJobManager.updateProgress(jobId, { syncedCount: totalSynced });
+        }
+
+        hasMore = listings.length === limit;
+        offset += limit;
+      }
     }
 
     // Remove listings that no longer exist on Etsy (deleted/expired)

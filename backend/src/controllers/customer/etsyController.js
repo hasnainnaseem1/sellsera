@@ -687,13 +687,23 @@ const publishListing = async (req, res) => {
 
     const { listingId } = req.params;
 
-    const result = await etsyApi.authenticatedRequest(shop, 'PUT',
+    const result = await etsyApi.authenticatedRequest(shop, 'PATCH',
       `/v3/application/shops/${shop.shopId}/listings/${listingId}`,
       { body: { state: 'active' } }
     );
 
     if (!result.success) {
       log.error('Publish listing failed:', result.error);
+
+      // If listing was deleted on Etsy, clean up locally
+      if (result.status === 404 || (result.error && String(result.error).toLowerCase().includes('not found'))) {
+        await EtsyListing.deleteOne({ shopId: shop._id, etsyListingId: String(listingId) }).catch(() => {});
+        return res.status(404).json({
+          success: false,
+          message: 'This listing no longer exists on Etsy. It has been removed from your dashboard. Please sync to refresh.',
+        });
+      }
+
       return res.status(502).json({
         success: false,
         message: result.error || 'Failed to publish listing. Make sure it has at least one image.',

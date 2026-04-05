@@ -41,7 +41,13 @@ const ActiveListingsPage = () => {
       message.success('Listing published successfully!');
       fetchListings();
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to publish. Ensure listing has at least one image.');
+      const errMsg = err?.response?.data?.message || 'Failed to publish. Ensure listing has at least one image.';
+      if (err?.response?.status === 404) {
+        message.warning(errMsg);
+        fetchListings(); // Refresh to remove deleted listing
+      } else {
+        message.error(errMsg);
+      }
     } finally {
       setPublishing(null);
     }
