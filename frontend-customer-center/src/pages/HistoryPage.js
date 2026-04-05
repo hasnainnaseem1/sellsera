@@ -81,8 +81,13 @@ const HistoryPage = () => {
       title: 'Category',
       dataIndex: 'category',
       key: 'category',
-      width: 160,
-      render: (text) => <Tag>{text}</Tag>,
+      width: 200,
+      ellipsis: true,
+      render: (text) => (
+        <Tag style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {text}
+        </Tag>
+      ),
     },
     {
       title: 'Score',
@@ -173,6 +178,7 @@ const HistoryPage = () => {
           dataSource={filtered}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 800 }}
           pagination={{
             ...pagination,
             showSizeChanger: true,
