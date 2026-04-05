@@ -80,4 +80,14 @@ router.post('/listings/:listingId/files', checkShopConnection, upload.single('fi
 // @access  Private — requires shop connection
 router.put('/listings/:listingId/publish', checkShopConnection, etsyController.publishListing);
 
+// @route   GET /api/v1/customer/etsy/taxonomy/:taxonomyId/properties
+// @desc    Get available listing properties for a taxonomy (category)
+// @access  Private — requires shop connection
+router.get('/taxonomy/:taxonomyId/properties', checkShopConnection, etsyController.getTaxonomyProperties);
+
+// @route   POST /api/v1/customer/etsy/listings/:listingId/properties
+// @desc    Set listing attributes (craft type, occasion, etc.)
+// @access  Private — requires shop connection
+router.post('/listings/:listingId/properties', checkShopConnection, etsyController.setListingProperties);
+
 module.exports = router;

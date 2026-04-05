@@ -49,6 +49,12 @@ const etsyApi = {
   // Publish a draft listing
   publishListing: (listingId) => axiosInstance.put(`/api/v1/customer/etsy/listings/${listingId}/publish`).then(r => r.data),
 
+  // Get taxonomy properties (craft type, occasion, etc.) for a category
+  getTaxonomyProperties: (taxonomyId) => axiosInstance.get(`/api/v1/customer/etsy/taxonomy/${taxonomyId}/properties`).then(r => r.data),
+
+  // Set listing properties (attributes) after creation
+  setListingProperties: (listingId, properties) => axiosInstance.post(`/api/v1/customer/etsy/listings/${listingId}/properties`, { properties }).then(r => r.data),
+
   // Listing audit
   auditListing:  (data) => axiosInstance.post('/api/v1/customer/listing-audit', data).then(r => r.data),
   getAuditHistory: (params = {}) => axiosInstance.get('/api/v1/customer/listing-audit/history', { params }).then(r => r.data),

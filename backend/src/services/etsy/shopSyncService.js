@@ -100,6 +100,7 @@ const syncListings = async (etsyShop, jobId = null) => {
           { upsert: true, new: true }
         );
         totalSynced++;
+        syncedEtsyIds.push(String(listing.listing_id));
       }
 
       // Report progress after each page
@@ -109,6 +110,17 @@ const syncListings = async (etsyShop, jobId = null) => {
 
       hasMore = listings.length === limit;
       offset += limit;
+    }
+
+    // Remove listings that no longer exist on Etsy (deleted/expired)
+    if (syncedEtsyIds.length > 0) {
+      const deleteResult = await EtsyListing.deleteMany({
+        shopId: etsyShop._id,
+        etsyListingId: { $nin: syncedEtsyIds },
+      });
+      if (deleteResult.deletedCount > 0) {
+        log.info(`Removed ${deleteResult.deletedCount} listings no longer on Etsy for shop ${etsyShop.shopId}`);
+      }
     }
 
     // Update shop metadata

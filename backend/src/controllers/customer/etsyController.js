@@ -646,6 +646,9 @@ const uploadListingFile = async (req, res) => {
     const blob = new Blob([req.file.buffer], { type: req.file.mimetype || 'application/octet-stream' });
     const formData = new FormData();
     formData.append('file', blob, req.file.originalname);
+    formData.append('name', req.file.originalname);
+
+    log.info(`Uploading digital file "${req.file.originalname}" (${req.file.size} bytes, ${req.file.mimetype}) to listing ${listingId}`);
 
     const result = await etsyApi.authenticatedRequest(shop, 'POST',
       `/v3/application/shops/${shop.shopId}/listings/${listingId}/files`,
@@ -718,6 +721,102 @@ const publishListing = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/v1/customer/etsy/taxonomy/:taxonomyId/properties
+ * Get available listing properties for a given taxonomy (category) ID.
+ * Returns properties like Craft type, Occasion, Celebration, etc.
+ */
+const getTaxonomyProperties = async (req, res) => {
+  try {
+    const { taxonomyId } = req.params;
+
+    if (!taxonomyId || isNaN(taxonomyId)) {
+      return res.status(400).json({ success: false, message: 'Valid taxonomy ID required' });
+    }
+
+    const result = await etsyApi.publicRequest(
+      'GET',
+      `/v3/application/seller-taxonomy/nodes/${taxonomyId}/properties`
+    );
+
+    if (!result.success) {
+      log.error('Fetch taxonomy properties failed:', result.error);
+      return res.status(502).json({ success: false, message: result.error || 'Failed to fetch properties' });
+    }
+
+    // Filter to attribute-capable properties and format
+    const properties = (result.data?.results || [])
+      .filter(p => p.supports_attributes)
+      .map(p => ({
+        propertyId: p.property_id,
+        name: p.name,
+        displayName: p.display_name,
+        isRequired: p.is_required,
+        possibleValues: (p.possible_values || []).map(v => ({
+          valueId: v.value_id,
+          name: v.name,
+        })),
+        scales: (p.scales || []).map(s => ({
+          scaleId: s.scale_id,
+          displayName: s.display_name,
+        })),
+      }));
+
+    return res.json({ success: true, data: properties });
+  } catch (error) {
+    log.error('Get taxonomy properties error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to fetch category properties' });
+  }
+};
+
+/**
+ * POST /api/v1/customer/etsy/listings/:listingId/properties
+ * Set listing properties (attributes) like Craft type, Occasion, etc.
+ * Body: { properties: [{ propertyId, valueIds, values, scaleId }] }
+ */
+const setListingProperties = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+    const { properties } = req.body;
+
+    if (!properties || !Array.isArray(properties) || properties.length === 0) {
+      return res.json({ success: true, data: { set: 0 } });
+    }
+
+    let setCount = 0;
+    const errors = [];
+
+    for (const prop of properties) {
+      const body = {};
+      if (prop.valueIds && prop.valueIds.length > 0) body.value_ids = prop.valueIds;
+      if (prop.values && prop.values.length > 0) body.values = prop.values;
+      if (prop.scaleId) body.scale_id = prop.scaleId;
+
+      const result = await etsyApi.authenticatedRequest(shop, 'PUT',
+        `/v3/application/listings/${listingId}/properties/${prop.propertyId}`,
+        { body }
+      );
+
+      if (result.success) {
+        setCount++;
+      } else {
+        log.warn(`Property ${prop.propertyId} set failed for listing ${listingId}: ${result.error}`);
+        errors.push({ propertyId: prop.propertyId, error: result.error });
+      }
+    }
+
+    return res.json({ success: true, data: { set: setCount, errors } });
+  } catch (error) {
+    log.error('Set listing properties error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to set listing properties' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
@@ -732,4 +831,6 @@ module.exports = {
   uploadListingImage,
   uploadListingFile,
   publishListing,
+  getTaxonomyProperties,
+  setListingProperties,
 };

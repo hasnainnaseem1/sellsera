@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Modal, Form, Input, InputNumber, Select, Switch, Upload, Button,
   Cascader, Steps, Typography, Row, Col, Divider, message, Alert, Tag, Space,
-  theme,
+  theme, Radio,
 } from 'antd';
 import {
   PlusOutlined, UploadOutlined, FileOutlined, PictureOutlined,
@@ -57,6 +57,9 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
   const [digitalFiles, setDigitalFiles] = useState([]);
   const [createdListingId, setCreatedListingId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [taxonomyProperties, setTaxonomyProperties] = useState([]);
+  const [propsLoading, setPropsLoading] = useState(false);
+  const [propertyValues, setPropertyValues] = useState({}); // { propertyId: { valueIds, values } }
 
   // Load categories on mount
   useEffect(() => {
@@ -86,6 +89,33 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
     }
   };
 
+  // Fetch taxonomy properties when category changes
+  const handleCategoryChange = useCallback(async (value) => {
+    if (!value || value.length === 0) {
+      setTaxonomyProperties([]);
+      setPropertyValues({});
+      return;
+    }
+    const taxonomyId = value[value.length - 1];
+    setPropsLoading(true);
+    try {
+      const res = await etsyApi.getTaxonomyProperties(taxonomyId);
+      setTaxonomyProperties(res.data || []);
+      setPropertyValues({}); // reset selections
+    } catch {
+      setTaxonomyProperties([]);
+    } finally {
+      setPropsLoading(false);
+    }
+  }, []);
+
+  const handlePropertyChange = (propertyId, valueId) => {
+    setPropertyValues(prev => ({
+      ...prev,
+      [propertyId]: { valueIds: valueId ? [valueId] : [], values: [] },
+    }));
+  };
+
   const resetForm = () => {
     form.resetFields();
     setStep(0);
@@ -94,6 +124,8 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
     setDigitalFiles([]);
     setCreatedListingId(null);
     setUploadProgress('');
+    setTaxonomyProperties([]);
+    setPropertyValues({});
   };
 
   const handleClose = () => {
@@ -187,6 +219,24 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
         }
       }
 
+      // Set taxonomy properties (craft type, occasion, etc.)
+      const propsToSet = Object.entries(propertyValues)
+        .filter(([, val]) => val.valueIds?.length > 0 || val.values?.length > 0)
+        .map(([propertyId, val]) => ({
+          propertyId: parseInt(propertyId, 10),
+          valueIds: val.valueIds || [],
+          values: val.values || [],
+        }));
+
+      if (propsToSet.length > 0) {
+        setUploadProgress('Setting listing attributes...');
+        try {
+          await etsyApi.setListingProperties(listingId, propsToSet);
+        } catch (err) {
+          message.warning('Some listing attributes could not be set');
+        }
+      }
+
       setUploadProgress('');
       message.success('Listing created successfully on Etsy!');
       onSuccess?.(createRes.data);
@@ -253,6 +303,7 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
               }}
               changeOnSelect
               loading={categoriesLoading}
+              onChange={handleCategoryChange}
             />
           </Form.Item>
 
@@ -270,6 +321,55 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
               suffixIcon={<TagsOutlined />}
             />
           </Form.Item>
+
+          {/* Dynamic taxonomy properties: Craft type, Occasion, Celebration, etc. */}
+          {taxonomyProperties.length > 0 && (
+            <div style={{
+              background: cardBg, borderRadius: radii.sm, padding: 16,
+              border: `1px solid ${borderColor}`, marginBottom: 16,
+            }}>
+              <Text strong style={{ display: 'block', marginBottom: 12 }}>
+                Category Attributes
+              </Text>
+              <Row gutter={16}>
+                {taxonomyProperties.map(prop => (
+                  <Col xs={24} sm={12} key={prop.propertyId}>
+                    <Form.Item
+                      label={
+                        <span>
+                          {prop.displayName || prop.name}
+                          {prop.isRequired && <Text type="danger" style={{ marginLeft: 4 }}>*</Text>}
+                          {!prop.isRequired && <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>(optional)</Text>}
+                        </span>
+                      }
+                      style={{ marginBottom: 12 }}
+                    >
+                      <Select
+                        placeholder={`Select ${prop.displayName || prop.name}`}
+                        allowClear
+                        showSearch
+                        loading={propsLoading}
+                        value={propertyValues[prop.propertyId]?.valueIds?.[0] || undefined}
+                        onChange={(val) => handlePropertyChange(prop.propertyId, val)}
+                        filterOption={(input, option) =>
+                          (option?.children || '').toLowerCase().includes(input.toLowerCase())
+                        }
+                      >
+                        {prop.possibleValues.map(v => (
+                          <Select.Option key={v.valueId} value={v.valueId}>
+                            {v.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          )}
+          {propsLoading && (
+            <Text type="secondary" style={{ fontSize: 12 }}>Loading category attributes...</Text>
+          )}
 
           <Form.Item
             name="materials"
@@ -309,6 +409,32 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
                 : 'Physical product — requires a shipping profile'}
             </Text>
           </div>
+
+          {isDigital && (
+            <Form.Item
+              name="contentSource"
+              label="How is this digital content created?"
+              initialValue="created_by_me"
+              style={{ marginBottom: 16 }}
+            >
+              <Radio.Group>
+                <Space direction="vertical">
+                  <Radio value="created_by_me">
+                    <div>
+                      <Text strong>Created by me</Text><br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>It's designed and created entirely by me.</Text>
+                    </div>
+                  </Radio>
+                  <Radio value="with_ai_generator">
+                    <div>
+                      <Text strong>With an AI generator</Text><br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>It's created with help from an AI generator.</Text>
+                    </div>
+                  </Radio>
+                </Space>
+              </Radio.Group>
+            </Form.Item>
+          )}
 
           <Row gutter={16}>
             <Col xs={24} sm={12}>
@@ -403,6 +529,18 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
               ) : null
             }
           </Form.Item>
+
+          <div style={{
+            background: cardBg, borderRadius: radii.sm, padding: 12,
+            border: `1px solid ${borderColor}`, marginTop: 12,
+          }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              <strong>Production partners:</strong> If someone else helps make your products, you can add them on{' '}
+              <a href="https://www.etsy.com/your/shops/me/production-partners" target="_blank" rel="noopener noreferrer">
+                Etsy → Production Partners
+              </a>
+            </Text>
+          </div>
         </>
       ),
     },
