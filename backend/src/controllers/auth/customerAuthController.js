@@ -911,6 +911,8 @@ const getMe = async (req, res) => {
         trialEndsAt: user.trialEndsAt || null,
         etsyConnected: etsyShopCount > 0,
         etsyShopCount,
+        hasPassword: !!user.password,
+        googleId: !!user.googleId,
         isEmailVerified: user.isEmailVerified,
         status: user.status,
         lastLogin: user.lastLogin,
@@ -982,8 +984,8 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Current and new password are required' });
+    if (!newPassword) {
+      return res.status(400).json({ success: false, message: 'New password is required' });
     }
     if (newPassword.length < 8) {
       return res.status(400).json({ success: false, message: 'New password must be at least 8 characters' });
@@ -998,10 +1000,17 @@ const changePassword = async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const bcrypt = require('bcryptjs');
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    // SSO users (Google) who never set a password can skip currentPassword
+    const isSSO = !!user.googleId && !user.password;
+    if (!isSSO) {
+      if (!currentPassword) {
+        return res.status(400).json({ success: false, message: 'Current password is required' });
+      }
+      const bcrypt = require('bcryptjs');
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      }
     }
 
     // Assign plain password — the User model pre-save hook handles bcrypt hashing

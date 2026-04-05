@@ -283,7 +283,7 @@ const AppLayout = ({ children }) => {
           </div>
         )}
 
-        {/* ── Features section (top, scrollable) ── */}
+        {/* ── Features section (scrollable) ── */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {sectionLabel('Menu')}
           <Menu
@@ -306,10 +306,7 @@ const AppLayout = ({ children }) => {
             style={{ background: 'transparent', border: 'none', fontSize: 14 }}
             theme={isDark ? 'dark' : 'light'}
           />
-        </div>
 
-        {/* ── Account section (bottom, fixed) ── */}
-        <div style={{ flexShrink: 0 }}>
           {sectionLabel('Account')}
           <Menu
             mode="inline"

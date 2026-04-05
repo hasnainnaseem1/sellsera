@@ -127,7 +127,7 @@ const AccountSettingsPage = () => {
 
         {/* Tab Content */}
         {activeTab === "profile" && <ProfileTab card={card} gradBtn={gradBtn} tok={tok} isDark={isDark} user={user} token={token} updateUser={updateUser} />}
-        {activeTab === "security" && <SecurityTab card={card} gradBtn={gradBtn} tok={tok} isDark={isDark} token={token} />}
+        {activeTab === "security" && <SecurityTab card={card} gradBtn={gradBtn} tok={tok} isDark={isDark} token={token} user={user} />}
         {activeTab === "subscription" && <SubscriptionTab card={card} tok={tok} isDark={isDark} user={user} token={token} fetchMe={fetchMe} onChangeTab={handleTabChange} />}
         {activeTab === "plans" && <PlansTab card={card} tok={tok} isDark={isDark} token={token} />}
         {activeTab === "billing" && <BillingTab card={card} tok={tok} isDark={isDark} user={user} />}
@@ -226,25 +226,30 @@ const ProfileTab = ({ card, gradBtn, tok, isDark, user, token, updateUser }) => 
 };
 
 /* ═══════════════════════════════════════ SECURITY TAB ═══════════════════════════════════════ */
-const SecurityTab = ({ card, gradBtn, tok, isDark, token }) => {
+const SecurityTab = ({ card, gradBtn, tok, isDark, token, user }) => {
   const [pwdForm] = Form.useForm();
   const [pwdMsg, setPwdMsg] = useState(null);
   const [changingPwd, setChangingPwd] = useState(false);
   const [newPwd, setNewPwd] = useState("");
   const pwdStrength = getStrength(newPwd);
 
+  const isSSO = !!user?.googleId && !user?.hasPassword;
+
   const handleChangePwd = async (values) => {
     setPwdMsg(null);
     setChangingPwd(true);
     try {
+      const body = { newPassword: values.newPassword };
+      if (!isSSO) body.currentPassword = values.currentPassword;
+
       const res = await fetch(`${config.apiUrl}/api/v1/auth/customer/me/password`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ currentPassword: values.currentPassword, newPassword: values.newPassword }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
-        setPwdMsg({ type: "success", text: "Password changed successfully!" });
+        setPwdMsg({ type: "success", text: isSSO ? "Password set successfully! You can now log in with email & password." : "Password changed successfully!" });
         pwdForm.resetFields();
         setNewPwd("");
       } else {
@@ -259,10 +264,24 @@ const SecurityTab = ({ card, gradBtn, tok, isDark, token }) => {
 
   return (
     <Card style={card} styles={{ body: { padding: "32px 36px" } }}>
-      <Title level={5} style={{ margin: "0 0 6px" }}>Change Password</Title>
+      <Title level={5} style={{ margin: "0 0 6px" }}>
+        {isSSO ? "Set Password" : "Change Password"}
+      </Title>
       <Paragraph type="secondary" style={{ margin: "0 0 28px", fontSize: 13 }}>
-        Use a strong, unique password with at least 8 characters.
+        {isSSO
+          ? "You signed up with Google. Set a password to also log in with your email and password."
+          : "Use a strong, unique password with at least 8 characters."}
       </Paragraph>
+
+      {isSSO && (
+        <Alert
+          type="info"
+          showIcon
+          message="Google Account Linked"
+          description="You can set a password below to enable email & password login alongside Google sign-in."
+          style={{ marginBottom: 20, borderRadius: tok.borderRadius }}
+        />
+      )}
 
       {pwdMsg && (
         <Alert type={pwdMsg.type} message={pwdMsg.text} showIcon
@@ -270,11 +289,13 @@ const SecurityTab = ({ card, gradBtn, tok, isDark, token }) => {
       )}
 
       <Form form={pwdForm} layout="vertical" onFinish={handleChangePwd} requiredMark={false} style={{ maxWidth: 480 }}>
-        <Form.Item name="currentPassword" label={<Text strong>Current Password</Text>}
-          rules={[{ required: true, message: "Current password is required" }]}>
-          <Password prefix={<LockOutlined style={{ color: tok.colorTextQuaternary }} />} size="large" placeholder="••••••••" />
-        </Form.Item>
-        <Form.Item name="newPassword" label={<Text strong>New Password</Text>}
+        {!isSSO && (
+          <Form.Item name="currentPassword" label={<Text strong>Current Password</Text>}
+            rules={[{ required: true, message: "Current password is required" }]}>
+            <Password prefix={<LockOutlined style={{ color: tok.colorTextQuaternary }} />} size="large" placeholder="••••••••" />
+          </Form.Item>
+        )}
+        <Form.Item name="newPassword" label={<Text strong>{isSSO ? "Password" : "New Password"}</Text>}
           rules={[{ required: true, message: "New password is required" }, { min: 8, message: "Minimum 8 characters" }]}>
           <Password prefix={<LockOutlined style={{ color: tok.colorTextQuaternary }} />} size="large" placeholder="••••••••"
             onChange={(e) => setNewPwd(e.target.value)} />
@@ -285,7 +306,7 @@ const SecurityTab = ({ card, gradBtn, tok, isDark, token }) => {
             <Text style={{ fontSize: 12, color: pwdStrength.color }}>{pwdStrength.label} password</Text>
           </div>
         )}
-        <Form.Item name="confirmPassword" label={<Text strong>Confirm New Password</Text>}
+        <Form.Item name="confirmPassword" label={<Text strong>Confirm {isSSO ? "Password" : "New Password"}</Text>}
           dependencies={["newPassword"]}
           rules={[
             { required: true, message: "Please confirm your password" },
@@ -300,7 +321,7 @@ const SecurityTab = ({ card, gradBtn, tok, isDark, token }) => {
           <Password prefix={<LockOutlined style={{ color: tok.colorTextQuaternary }} />} size="large" placeholder="••••••••" />
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={changingPwd} size="large" style={gradBtn} icon={<LockOutlined />}>
-          {changingPwd ? "Changing…" : "Change Password"}
+          {changingPwd ? (isSSO ? "Setting…" : "Changing…") : (isSSO ? "Set Password" : "Change Password")}
         </Button>
       </Form>
     </Card>
