@@ -328,8 +328,8 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       const newMats = (values.materials || []).sort().join(',');
       if (newMats !== oldMats) payload.materials = values.materials || [];
 
-      // Shipping profile (physical only)
-      if (!listingData.isDigital && values.shippingProfileId !== listingData.shippingProfileId) {
+      // Shipping profile (physical only) — normalize both sides to avoid null vs undefined mismatch
+      if (!listingData.isDigital && (values.shippingProfileId || null) !== (listingData.shippingProfileId || null)) {
         payload.shippingProfileId = values.shippingProfileId;
       }
 
@@ -350,6 +350,11 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
           payload.personalizationCharCountMax = values.personalizationCharCountMax;
         }
       }
+
+      // Remove undefined/null values — prevents false positives from null vs undefined comparisons
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === undefined || payload[key] === null) delete payload[key];
+      });
 
       if (Object.keys(payload).length === 0) {
         // Check if taxonomy properties changed
