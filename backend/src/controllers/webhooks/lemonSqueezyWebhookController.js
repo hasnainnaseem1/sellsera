@@ -24,6 +24,7 @@ const emailService = require('../../services/email/emailService');
 const { notifySubscriptionChange } = require('../../services/notification/adminNotifier');
 const { generateSignedInvoiceUrl } = require('../../controllers/customer/billingController');
 const lemonSqueezyService = require('../../services/lemonsqueezy/lemonSqueezyService');
+const { downgradeToFree } = require('../../services/subscription/downgradeService');
 const { safeSave } = require('../../utils/helpers/safeDbOps');
 const log = require('../../utils/logger')('LemonSqueezy');
 
@@ -173,8 +174,29 @@ const handleSubscriptionCancelled = async (event, customData) => {
   const oldPlanName = user.planSnapshot?.planName || 'Unknown';
   const endsAt = event.data.attributes.ends_at;
 
-  if (endsAt) user.subscriptionExpiresAt = new Date(endsAt);
-  await safeSave(user);
+  // Graceful cancellation: keep current plan until period end
+  // Only mark status as cancelled if the period has already ended
+  if (endsAt) {
+    const endsAtDate = new Date(endsAt);
+    user.subscriptionExpiresAt = endsAtDate;
+
+    if (endsAtDate <= new Date()) {
+      // Period already ended — downgrade immediately
+      user.subscriptionStatus = 'cancelled';
+      await downgradeToFree(user, { reason: 'subscription_cancelled_past_period', clearSubscriptionId: true });
+      log.info(`Subscription cancelled (past period end) & downgraded: ${user.email}`);
+    } else {
+      // Period still active — keep current plan, just record the cancellation date
+      // User retains access until subscriptionExpiresAt
+      await safeSave(user);
+      log.info(`Subscription cancelled (active until ${endsAt}): ${user.email}`);
+    }
+  } else {
+    // No end date — immediate cancellation
+    user.subscriptionStatus = 'cancelled';
+    await downgradeToFree(user, { reason: 'subscription_cancelled_immediate', clearSubscriptionId: true });
+    log.info(`Subscription cancelled (immediate) & downgraded: ${user.email}`);
+  }
 
   emailService.sendPlanChangeEmail(user, oldPlanName, 'Cancelled (at period end)').catch(() => {});
   notifySubscriptionChange({
@@ -184,8 +206,6 @@ const handleSubscriptionCancelled = async (event, customData) => {
     changeType: 'cancelled',
     source: 'lemonsqueezy',
   }).catch(() => {});
-
-  log.info(`Subscription cancelled: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────
@@ -212,20 +232,23 @@ const handleSubscriptionExpired = async (event, customData) => {
   if (!user) return;
 
   const oldPlanName = user.planSnapshot?.planName || 'Unknown';
-  user.subscriptionStatus = 'expired';
-  user.lemonSqueezySubscriptionId = null;
-  await safeSave(user);
 
-  emailService.sendPlanChangeEmail(user, oldPlanName, 'Expired').catch(() => {});
+  // Set status to expired
+  user.subscriptionStatus = 'expired';
+
+  // Downgrade to Free plan: reset quotas, clear subscription IDs, assign Free plan snapshot
+  await downgradeToFree(user, { reason: 'subscription_expired', clearSubscriptionId: true });
+
+  emailService.sendPlanChangeEmail(user, oldPlanName, 'Free (Expired)').catch(() => {});
   notifySubscriptionChange({
     customer: user,
     oldPlan: oldPlanName,
-    newPlan: 'Expired',
+    newPlan: 'Free',
     changeType: 'expired',
     source: 'lemonsqueezy',
   }).catch(() => {});
 
-  log.info(`Subscription expired: ${user.email}`);
+  log.info(`Subscription expired & downgraded to Free: ${user.email}`);
 };
 
 // ──────────────────────────────────────────────

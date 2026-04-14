@@ -44,8 +44,31 @@ const checkFeatureAccess = (featureKey) => {
         return next();
       }
 
-      // Get plan features from snapshot
-      const planFeatures = user.planSnapshot?.features || [];
+      // ─── Subscription status enforcement ───
+      // If the user's subscription is anything other than 'active' or 'trial',
+      // override their plan snapshot to Free-tier limits regardless of what
+      // the database says. This closes the loophole where an expired/cancelled
+      // user retains their old planSnapshot.
+      const status = user.subscriptionStatus;
+      const isValidSubscription = status === 'active' || status === 'trial' || status === 'past_due';
+
+      let planFeatures;
+
+      if (!isValidSubscription) {
+        // Expired/cancelled/none — use empty features (Free tier fallback)
+        // This ensures no premium feature access even if planSnapshot wasn't cleaned up
+        const Plan = require('../../models/subscription/Plan');
+        let freePlan = await Plan.findOne({ slug: 'free', isActive: true });
+        if (!freePlan) {
+          freePlan = await Plan.findOne({ name: { $regex: /^free$/i }, isActive: true });
+        }
+        planFeatures = freePlan?.features || [];
+
+        log.warn(`Subscription not active (${status || 'none'}): ${user.email} — enforcing Free tier for ${featureKey}`);
+      } else {
+        // Active/trial/past_due — use their plan snapshot
+        planFeatures = user.planSnapshot?.features || [];
+      }
 
       // Find this feature in the customer's plan
       const feature = planFeatures.find(

@@ -75,8 +75,21 @@ const checkSubscription = async (req, res, next) => {
       return next();
     }
 
-    // Active subscription — all good
+    // Active subscription — check if it's actually expired (past subscriptionExpiresAt)
     if (status === 'active') {
+      if (user.subscriptionExpiresAt && new Date() >= new Date(user.subscriptionExpiresAt)) {
+        // Subscription period ended but status wasn't updated (e.g. missed webhook)
+        user.subscriptionStatus = 'expired';
+        await user.save();
+        log.warn(`Auto-expired active subscription (past expiresAt) for ${user.email}`);
+
+        return res.status(403).json({
+          success: false,
+          code: 'SUBSCRIPTION_EXPIRED',
+          message: 'Your subscription has expired. Please renew or upgrade your plan to continue.',
+          upgradeRequired: true,
+        });
+      }
       return next();
     }
 

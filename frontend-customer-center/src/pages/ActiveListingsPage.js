@@ -34,6 +34,7 @@ const ActiveListingsPage = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [publishing, setPublishing] = useState(null);
   const [uploading, setUploading] = useState(null);
+  const [syncing, setSyncing] = useState(false);
 
   const handleFileUpload = (listingId, autoPublish = false) => {
     return new Promise((resolve) => {
@@ -101,6 +102,55 @@ const ActiveListingsPage = () => {
     borderRadius: radii.lg,
     border: `1px solid ${isDark ? colors.darkBorder : colors.lightBorder}`,
     background: tok.colorBgContainer,
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    const hide = message.loading('Syncing listings from Etsy...', 0);
+    try {
+      const res = await etsyApi.sync();
+      const jobId = res.data?.jobId || res.jobId;
+      if (!jobId) {
+        hide();
+        message.success('Sync completed!');
+        fetchListings();
+        setSyncing(false);
+        return;
+      }
+      const poll = setInterval(async () => {
+        try {
+          const status = await etsyApi.getSyncStatus(jobId);
+          const st = status.data?.status || status.status;
+          if (st === 'completed') {
+            clearInterval(poll);
+            hide();
+            message.success('Listings synced successfully!');
+            fetchListings();
+            setSyncing(false);
+          } else if (st === 'failed') {
+            clearInterval(poll);
+            hide();
+            message.error(status.data?.error || status.error || 'Sync failed');
+            setSyncing(false);
+          }
+        } catch {
+          clearInterval(poll);
+          hide();
+          message.error('Failed to check sync status');
+          setSyncing(false);
+        }
+      }, 3000);
+      // Safety timeout — 5 minutes
+      setTimeout(() => {
+        clearInterval(poll);
+        hide();
+        setSyncing(false);
+      }, 5 * 60 * 1000);
+    } catch (err) {
+      hide();
+      message.error(err?.response?.data?.message || 'Failed to start sync');
+      setSyncing(false);
+    }
   };
 
   const fetchListings = useCallback(async () => {
@@ -278,7 +328,7 @@ const ActiveListingsPage = () => {
               >
                 Create Listing
               </Button>
-              <Button icon={<ReloadOutlined />} loading={loading} onClick={fetchListings}>
+              <Button icon={<ReloadOutlined />} loading={syncing} onClick={handleSync}>
                 Sync
               </Button>
             </Space>

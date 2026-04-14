@@ -12,6 +12,7 @@ const shopSync = require('./shopSync');
 const competitorSync = require('./competitorSync');
 const apiKeyReset = require('./apiKeyReset');
 const keywordSnapshot = require('./keywordSnapshot');
+const subscriptionSync = require('./subscriptionSync');
 const log = require('../utils/logger')('Cron');
 
 /* ─── Built-in system jobs ─── */
@@ -107,6 +108,19 @@ const systemJobs = {
     runCount: 0,
     task: null,
   },
+  subscriptionSync: {
+    name: 'Subscription Status Sync',
+    description: 'Reconciles local subscription states with LemonSqueezy API and downgrades expired users',
+    schedule: '0 6 * * *',
+    scheduleLabel: 'Daily at 6:00 AM',
+    system: true,
+    enabled: true,
+    lastRun: null,
+    lastStatus: null,
+    lastError: null,
+    runCount: 0,
+    task: null,
+  },
 };
 
 const systemRunners = {
@@ -117,6 +131,7 @@ const systemRunners = {
   competitorSync: competitorSync.run,
   apiKeyReset: apiKeyReset.run,
   keywordSnapshot: keywordSnapshot.run,
+  subscriptionSync: subscriptionSync.run,
 };
 
 /* ─── Custom jobs (loaded from DB at init, keyed by DB _id) ─── */

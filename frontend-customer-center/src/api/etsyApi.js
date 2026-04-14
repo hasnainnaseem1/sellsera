@@ -13,6 +13,9 @@ const etsyApi = {
   // Manually trigger listing sync for a specific shop
   syncShop:      (shopId) => axiosInstance.post(`/api/v1/customer/etsy/shop/${shopId}/sync`).then(r => r.data),
 
+  // Trigger sync for the default connected shop (no shopId needed)
+  sync:          () => axiosInstance.post('/api/v1/customer/etsy/sync').then(r => r.data),
+
   // Poll sync job status
   getSyncStatus: (jobId) => axiosInstance.get(`/api/v1/customer/etsy/sync-status/${jobId}`).then(r => r.data),
 
