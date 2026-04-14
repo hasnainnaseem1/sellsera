@@ -132,6 +132,7 @@ const addCompetitor = async (req, res) => {
 
     const existing = await CompetitorWatch.findOne({
       userId: req.userId,
+      shopId: req.etsyShop._id,
       shopName: { $regex: new RegExp(`^${cleanName}$`, 'i') },
     });
     if (existing) {
@@ -158,6 +159,7 @@ const addCompetitor = async (req, res) => {
 
     const watch = await CompetitorWatch.create({
       userId: req.userId,
+      shopId: req.etsyShop._id,
       shopName: shopData.shopName,
       etsyShopId: shopData.etsyShopId,
       shopCountry: shopData.shopCountry,
@@ -230,7 +232,13 @@ const removeCompetitor = async (req, res) => {
 
 const getWatchList = async (req, res) => {
   try {
-const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id })
+    // Backfill: assign shopId to any orphaned watches (created before shopId was set)
+    await CompetitorWatch.updateMany(
+      { userId: req.userId, $or: [{ shopId: null }, { shopId: { $exists: false } }] },
+      { $set: { shopId: req.etsyShop._id } }
+    );
+
+    const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id })
       .sort({ addedAt: -1 })
       .lean();
 
@@ -347,7 +355,13 @@ const getSalesData = async (req, res) => {
 
 const salesOverview = async (req, res) => {
   try {
-const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id, status: 'active' })
+    // Backfill: assign shopId to any orphaned watches
+    await CompetitorWatch.updateMany(
+      { userId: req.userId, $or: [{ shopId: null }, { shopId: { $exists: false } }] },
+      { $set: { shopId: req.etsyShop._id } }
+    );
+
+    const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id, status: 'active' })
       .sort({ addedAt: -1 })
       .lean();
 
