@@ -11,6 +11,12 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
+// Separate multer config for video uploads (in-memory, max 100MB — Etsy's limit)
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
+});
+
 // @route   GET /api/v1/customer/etsy/auth
 // @desc    Initiate Etsy OAuth flow (returns auth URL)
 // @access  Private — auth applied by parent router; shop limit checked
@@ -81,9 +87,9 @@ router.post('/listings/:listingId/images', checkShopConnection, upload.single('i
 router.delete('/listings/:listingId/images/:imageId', checkShopConnection, etsyController.deleteListingImage);
 
 // @route   POST /api/v1/customer/etsy/listings/:listingId/videos
-// @desc    Upload a video to an Etsy listing
+// @desc    Upload a video to an Etsy listing (auto-replaces existing video)
 // @access  Private — requires shop connection
-router.post('/listings/:listingId/videos', checkShopConnection, upload.single('video'), etsyController.uploadListingVideo);
+router.post('/listings/:listingId/videos', checkShopConnection, videoUpload.single('video'), etsyController.uploadListingVideo);
 
 // @route   DELETE /api/v1/customer/etsy/listings/:listingId/videos/:videoId
 // @desc    Delete a video from an Etsy listing

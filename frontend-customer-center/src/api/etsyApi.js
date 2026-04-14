@@ -50,6 +50,7 @@ const etsyApi = {
     formData.append('video', file);
     return axiosInstance.post(`/api/v1/customer/etsy/listings/${listingId}/videos`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000, // 5 minutes for video uploads
     }).then(r => r.data);
   },
 

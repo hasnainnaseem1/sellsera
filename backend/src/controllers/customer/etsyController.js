@@ -1042,6 +1042,7 @@ const deleteListingImage = async (req, res) => {
 /**
  * POST /api/v1/customer/etsy/listings/:listingId/videos
  * Upload a video to an Etsy listing.
+ * Etsy allows only 1 video per listing — automatically deletes existing video first.
  */
 const uploadListingVideo = async (req, res) => {
   try {
@@ -1053,6 +1054,23 @@ const uploadListingVideo = async (req, res) => {
     const { listingId } = req.params;
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No video file provided' });
+    }
+
+    // Etsy allows only 1 video per listing — delete existing video if any
+    try {
+      const existingVideos = await etsyApi.authenticatedRequest(shop, 'GET',
+        `/v3/application/listings/${listingId}/videos`
+      );
+      if (existingVideos.success && existingVideos.data?.results?.length > 0) {
+        for (const v of existingVideos.data.results) {
+          log.info(`Deleting existing video ${v.video_id} from listing ${listingId} before uploading new one`);
+          await etsyApi.authenticatedRequest(shop, 'DELETE',
+            `/v3/application/shops/${shop.shopId}/listings/${listingId}/videos/${v.video_id}`
+          );
+        }
+      }
+    } catch (delErr) {
+      log.warn('Could not check/delete existing videos, proceeding with upload:', delErr.message);
     }
 
     const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
