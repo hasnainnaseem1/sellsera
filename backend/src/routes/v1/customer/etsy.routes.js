@@ -75,6 +75,21 @@ router.patch('/listings/:listingId', checkShopConnection, checkSubscription, che
 // @access  Private — requires shop connection
 router.post('/listings/:listingId/images', checkShopConnection, upload.single('image'), etsyController.uploadListingImage);
 
+// @route   DELETE /api/v1/customer/etsy/listings/:listingId/images/:imageId
+// @desc    Delete an image from an Etsy listing
+// @access  Private — requires shop connection
+router.delete('/listings/:listingId/images/:imageId', checkShopConnection, etsyController.deleteListingImage);
+
+// @route   POST /api/v1/customer/etsy/listings/:listingId/videos
+// @desc    Upload a video to an Etsy listing
+// @access  Private — requires shop connection
+router.post('/listings/:listingId/videos', checkShopConnection, upload.single('video'), etsyController.uploadListingVideo);
+
+// @route   DELETE /api/v1/customer/etsy/listings/:listingId/videos/:videoId
+// @desc    Delete a video from an Etsy listing
+// @access  Private — requires shop connection
+router.delete('/listings/:listingId/videos/:videoId', checkShopConnection, etsyController.deleteListingVideo);
+
 // @route   POST /api/v1/customer/etsy/listings/:listingId/files
 // @desc    Upload a digital file to an Etsy listing
 // @access  Private — requires shop connection

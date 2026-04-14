@@ -40,6 +40,23 @@ const etsyApi = {
     }).then(r => r.data);
   },
 
+  // Delete an image from a listing
+  deleteListingImage: (listingId, imageId) =>
+    axiosInstance.delete(`/api/v1/customer/etsy/listings/${listingId}/images/${imageId}`).then(r => r.data),
+
+  // Upload video to a listing
+  uploadListingVideo: (listingId, file) => {
+    const formData = new FormData();
+    formData.append('video', file);
+    return axiosInstance.post(`/api/v1/customer/etsy/listings/${listingId}/videos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
+
+  // Delete a video from a listing
+  deleteListingVideo: (listingId, videoId) =>
+    axiosInstance.delete(`/api/v1/customer/etsy/listings/${listingId}/videos/${videoId}`).then(r => r.data),
+
   // Upload digital file to a listing
   uploadListingFile: (listingId, file) => {
     const formData = new FormData();

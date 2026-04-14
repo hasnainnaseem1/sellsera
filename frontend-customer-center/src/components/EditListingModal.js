@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal, Form, Input, InputNumber, Select, Switch, Button,
   Steps, Typography, Row, Col, Divider, message, Tag, Space,
-  Radio, Spin, Image,
+  Radio, Spin, Tooltip, Popconfirm,
 } from 'antd';
 import {
   EditOutlined, TagsOutlined, DollarOutlined, PictureOutlined,
+  PlusOutlined, DeleteOutlined, VideoCameraOutlined, CloseCircleFilled,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
@@ -40,6 +42,8 @@ const WHEN_MADE_OPTIONS = [
   { value: '1900s', label: '1900s' },
 ];
 
+const MAX_IMAGES = 10;
+
 const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const { isDark } = useTheme();
   const [form] = Form.useForm();
@@ -53,6 +57,15 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const [propertyValues, setPropertyValues] = useState({});
   const [listingData, setListingData] = useState(null);
   const [existingImages, setExistingImages] = useState([]);
+  const [existingVideos, setExistingVideos] = useState([]);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [deletingImageId, setDeletingImageId] = useState(null);
+  const [deletingVideoId, setDeletingVideoId] = useState(null);
+  const imageInputRef = useRef(null);
+  const replaceInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const [replaceIndex, setReplaceIndex] = useState(null);
 
   // Load listing data when modal opens
   useEffect(() => {
@@ -63,6 +76,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
         const d = res.data;
         setListingData(d);
         setExistingImages(d.images || []);
+        setExistingVideos(d.videos || []);
 
         // Pre-fill form
         form.setFieldsValue({
@@ -132,8 +146,127 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     setStep(0);
     setListingData(null);
     setExistingImages([]);
+    setExistingVideos([]);
     setTaxonomyProperties([]);
-    setPropertyValues({});
+    setPropertyValues([]);
+    setReplaceIndex(null);
+  };
+
+  // --- Image handlers ---
+  const handleImageUpload = async (file) => {
+    if (!file || !listingId) return;
+    setImageUploading(true);
+    try {
+      const res = await etsyApi.uploadListingImage(listingId, file);
+      if (res.success) {
+        message.success('Image uploaded');
+        // Refresh listing to get updated images
+        const refreshed = await etsyApi.getListingById(listingId);
+        setExistingImages(refreshed.data?.images || []);
+      } else {
+        message.error(res.message || 'Upload failed');
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to upload image');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleImageDelete = async (imageId) => {
+    if (!imageId || !listingId) return;
+    setDeletingImageId(imageId);
+    try {
+      const res = await etsyApi.deleteListingImage(listingId, imageId);
+      if (res.success) {
+        message.success('Image deleted');
+        setExistingImages(prev => prev.filter(img => img.listing_image_id !== imageId));
+      } else {
+        message.error(res.message || 'Delete failed');
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to delete image');
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
+  const handleImageReplace = async (file, imageToReplace) => {
+    if (!file || !listingId || !imageToReplace) return;
+    setImageUploading(true);
+    try {
+      // Delete old image first, then upload new one
+      await etsyApi.deleteListingImage(listingId, imageToReplace.listing_image_id);
+      await etsyApi.uploadListingImage(listingId, file);
+      message.success('Image replaced');
+      // Refresh listing to get updated images
+      const refreshed = await etsyApi.getListingById(listingId);
+      setExistingImages(refreshed.data?.images || []);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to replace image');
+    } finally {
+      setImageUploading(false);
+      setReplaceIndex(null);
+    }
+  };
+
+  const onAddImageFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file);
+    e.target.value = '';
+  };
+
+  const onReplaceImageFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file && replaceIndex !== null && existingImages[replaceIndex]) {
+      handleImageReplace(file, existingImages[replaceIndex]);
+    }
+    e.target.value = '';
+  };
+
+  // --- Video handlers ---
+  const handleVideoUpload = async (file) => {
+    if (!file || !listingId) return;
+    setVideoUploading(true);
+    try {
+      const res = await etsyApi.uploadListingVideo(listingId, file);
+      if (res.success) {
+        message.success('Video uploaded — it may take a few minutes to process on Etsy');
+        if (res.data) {
+          setExistingVideos(prev => [...prev, res.data]);
+        }
+      } else {
+        message.error(res.message || 'Upload failed');
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to upload video');
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const handleVideoDelete = async (videoId) => {
+    if (!videoId || !listingId) return;
+    setDeletingVideoId(videoId);
+    try {
+      const res = await etsyApi.deleteListingVideo(listingId, videoId);
+      if (res.success) {
+        message.success('Video deleted');
+        setExistingVideos(prev => prev.filter(v => v.video_id !== videoId));
+      } else {
+        message.error(res.message || 'Delete failed');
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to delete video');
+    } finally {
+      setDeletingVideoId(null);
+    }
+  };
+
+  const onVideoFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleVideoUpload(file);
+    e.target.value = '';
   };
 
   const handleClose = () => {
@@ -382,34 +515,245 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
             />
           </Form.Item>
 
-          {/* Existing images preview */}
-          {existingImages.length > 0 && (
-            <div style={{
-              background: cardBg, borderRadius: radii.sm, padding: 12,
-              border: `1px solid ${borderColor}`, marginTop: 8,
-            }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                <PictureOutlined style={{ marginRight: 6, color: BRAND }} />
-                Current Photos ({existingImages.length})
-              </Text>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {existingImages.map((img, i) => (
-                  <Image
-                    key={i}
-                    src={img.url_75x75 || img.url_170x135 || img.url}
-                    alt={`Photo ${i + 1}`}
-                    width={60}
-                    height={60}
-                    style={{ borderRadius: 6, objectFit: 'cover' }}
-                    preview={{ src: img.url_570xN || img.url_fullxfull || img.url }}
-                  />
-                ))}
-              </div>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
-                To add or remove photos, manage them directly on Etsy
-              </Text>
+          {/* Image management grid - 10 slots */}
+          <div style={{
+            background: cardBg, borderRadius: radii.sm, padding: 16,
+            border: `1px solid ${borderColor}`, marginTop: 8,
+          }}>
+            <Text strong style={{ display: 'block', marginBottom: 10 }}>
+              <PictureOutlined style={{ marginRight: 6, color: BRAND }} />
+              Photos ({existingImages.length}/{MAX_IMAGES})
+            </Text>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+              {Array.from({ length: MAX_IMAGES }).map((_, i) => {
+                const img = existingImages[i];
+                if (img) {
+                  // Filled slot — show image with overlay actions
+                  return (
+                    <div key={img.listing_image_id || i} style={{
+                      position: 'relative', width: '100%', aspectRatio: '1',
+                      borderRadius: 8, overflow: 'hidden',
+                      border: `2px solid ${borderColor}`,
+                    }}>
+                      <img
+                        src={img.url_170x135 || img.url_75x75 || img.url}
+                        alt={`Listing ${i + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                      {i === 0 && (
+                        <div style={{
+                          position: 'absolute', top: 4, left: 4,
+                          background: BRAND, color: '#fff', fontSize: 9,
+                          padding: '1px 5px', borderRadius: 4, fontWeight: 600,
+                        }}>Primary</div>
+                      )}
+                      {/* Overlay actions */}
+                      <div style={{
+                        position: 'absolute', bottom: 0, left: 0, right: 0,
+                        display: 'flex', justifyContent: 'center', gap: 4,
+                        background: 'rgba(0,0,0,0.55)', padding: '4px 0',
+                      }}>
+                        <Tooltip title="Replace">
+                          <Button
+                            type="text" size="small"
+                            icon={<EditOutlined style={{ color: '#fff', fontSize: 13 }} />}
+                            style={{ minWidth: 0, padding: '0 6px' }}
+                            disabled={imageUploading}
+                            onClick={() => {
+                              setReplaceIndex(i);
+                              replaceInputRef.current?.click();
+                            }}
+                          />
+                        </Tooltip>
+                        <Popconfirm
+                          title="Delete this image?"
+                          onConfirm={() => handleImageDelete(img.listing_image_id)}
+                          okText="Delete"
+                          okButtonProps={{ danger: true }}
+                        >
+                          <Tooltip title="Delete">
+                            <Button
+                              type="text" size="small"
+                              icon={<DeleteOutlined style={{ color: '#ff4d4f', fontSize: 13 }} />}
+                              style={{ minWidth: 0, padding: '0 6px' }}
+                              loading={deletingImageId === img.listing_image_id}
+                              disabled={imageUploading}
+                            />
+                          </Tooltip>
+                        </Popconfirm>
+                      </div>
+                    </div>
+                  );
+                }
+                // Empty slot — show + icon
+                return (
+                  <div
+                    key={`empty-${i}`}
+                    onClick={() => !imageUploading && existingImages.length < MAX_IMAGES && imageInputRef.current?.click()}
+                    style={{
+                      width: '100%', aspectRatio: '1',
+                      borderRadius: 8,
+                      border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      cursor: imageUploading ? 'not-allowed' : 'pointer',
+                      transition: 'border-color 0.2s',
+                      background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                    }}
+                    onMouseEnter={e => { if (!imageUploading) e.currentTarget.style.borderColor = BRAND; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
+                  >
+                    {imageUploading && i === existingImages.length ? (
+                      <Spin size="small" />
+                    ) : (
+                      <>
+                        <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
+                        <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Add</Text>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )}
+            {/* Hidden file inputs */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: 'none' }}
+              onChange={onAddImageFile}
+            />
+            <input
+              ref={replaceInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              style={{ display: 'none' }}
+              onChange={onReplaceImageFile}
+            />
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+              Etsy allows up to 10 photos. Supported: JPG, PNG, GIF, WebP.
+            </Text>
+          </div>
+
+          {/* Video section */}
+          <div style={{
+            background: cardBg, borderRadius: radii.sm, padding: 16,
+            border: `1px solid ${borderColor}`, marginTop: 12,
+          }}>
+            <Text strong style={{ display: 'block', marginBottom: 10 }}>
+              <VideoCameraOutlined style={{ marginRight: 6, color: BRAND }} />
+              Video {existingVideos.length > 0 ? `(${existingVideos.length})` : ''}
+            </Text>
+            {existingVideos.length > 0 ? (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {existingVideos.map(v => (
+                  <div key={v.video_id} style={{
+                    position: 'relative', width: 140, height: 100,
+                    borderRadius: 8, overflow: 'hidden',
+                    border: `2px solid ${borderColor}`,
+                    background: '#000',
+                  }}>
+                    {v.thumbnail_url ? (
+                      <img
+                        src={v.thumbnail_url}
+                        alt="Video thumbnail"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%', height: '100%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <VideoCameraOutlined style={{ fontSize: 28, color: '#666' }} />
+                      </div>
+                    )}
+                    <PlayCircleOutlined style={{
+                      position: 'absolute', top: '50%', left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      fontSize: 28, color: 'rgba(255,255,255,0.85)',
+                      pointerEvents: 'none',
+                    }} />
+                    {v.video_state && v.video_state !== 'active' && (
+                      <Tag color="orange" style={{
+                        position: 'absolute', top: 4, left: 4, fontSize: 10,
+                      }}>Processing</Tag>
+                    )}
+                    <Popconfirm
+                      title="Delete this video?"
+                      onConfirm={() => handleVideoDelete(v.video_id)}
+                      okText="Delete"
+                      okButtonProps={{ danger: true }}
+                    >
+                      <Button
+                        type="text" size="small"
+                        loading={deletingVideoId === v.video_id}
+                        icon={<CloseCircleFilled style={{ color: '#ff4d4f', fontSize: 16 }} />}
+                        style={{
+                          position: 'absolute', top: 2, right: 2,
+                          minWidth: 0, padding: 0, width: 22, height: 22,
+                          background: '#fff', borderRadius: '50%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      />
+                    </Popconfirm>
+                  </div>
+                ))}
+                {/* Add another video slot */}
+                <div
+                  onClick={() => !videoUploading && videoInputRef.current?.click()}
+                  style={{
+                    width: 140, height: 100, borderRadius: 8,
+                    border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    cursor: videoUploading ? 'not-allowed' : 'pointer',
+                    background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                  }}
+                  onMouseEnter={e => { if (!videoUploading) e.currentTarget.style.borderColor = BRAND; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
+                >
+                  {videoUploading ? <Spin size="small" /> : (
+                    <>
+                      <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
+                      <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Update</Text>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => !videoUploading && videoInputRef.current?.click()}
+                style={{
+                  width: '100%', padding: '20px 0',
+                  borderRadius: 8,
+                  border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  cursor: videoUploading ? 'not-allowed' : 'pointer',
+                  background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                }}
+                onMouseEnter={e => { if (!videoUploading) e.currentTarget.style.borderColor = BRAND; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
+              >
+                {videoUploading ? <Spin size="small" /> : (
+                  <>
+                    <VideoCameraOutlined style={{ fontSize: 24, color: isDark ? '#888' : '#bbb' }} />
+                    <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>Add a video</Text>
+                  </>
+                )}
+              </div>
+            )}
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/x-msvideo,video/webm"
+              style={{ display: 'none' }}
+              onChange={onVideoFile}
+            />
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+              Videos may take a few minutes to process after upload. Supported: MP4, MOV, AVI, WebM.
+            </Text>
+          </div>
         </>
       ),
     },

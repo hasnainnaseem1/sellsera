@@ -370,25 +370,41 @@ const getListingById = async (req, res) => {
     let personalizationCharCountMax = null;
     let personalizationInstructions = '';
 
+    let liveVideos = [];
     try {
       // Use authenticated request — the listing belongs to the user's shop
       const liveResult = await etsyApi.authenticatedRequest(shop, 'GET',
         `/v3/application/listings/${listing.etsyListingId}`,
-        { params: { includes: 'Images' } }
+        { params: { includes: 'Images,Videos' } }
       );
       if (liveResult.success && liveResult.data) {
         const ld = liveResult.data;
-        // Extract images
+        // Extract images with full data for edit/delete
         if (ld.images && ld.images.length > 0) {
           liveImages = ld.images.map(img => ({
+            listing_image_id: img.listing_image_id,
             url: img.url_570xN || img.url_fullxfull || img.url_170x135 || '',
+            url_75x75: img.url_75x75 || '',
+            url_170x135: img.url_170x135 || '',
+            url_570xN: img.url_570xN || '',
+            url_fullxfull: img.url_fullxfull || '',
             rank: img.rank || 0,
+            alt_text: img.alt_text || '',
           }));
           // Update DB cache so future loads are faster
           await EtsyListing.updateOne(
             { shopId: shop._id, etsyListingId: listing.etsyListingId },
-            { $set: { images: liveImages, isDigital: !!ld.is_digital } }
+            { $set: { images: liveImages.map(i => ({ url: i.url, rank: i.rank })), isDigital: !!ld.is_digital } }
           ).catch(() => {});
+        }
+        // Extract videos
+        if (ld.videos && ld.videos.length > 0) {
+          liveVideos = ld.videos.map(v => ({
+            video_id: v.video_id,
+            thumbnail_url: v.thumbnail_url || '',
+            video_url: v.video_url || '',
+            video_state: v.video_state || 'active',
+          }));
         }
         // Digital status
         if (ld.is_digital !== undefined) isDigital = ld.is_digital;
@@ -439,6 +455,7 @@ const getListingById = async (req, res) => {
         personalizationIsRequired,
         personalizationCharCountMax,
         personalizationInstructions,
+        videos: liveVideos,
       },
     });
   } catch (error) {
@@ -993,6 +1010,111 @@ const updateListing = async (req, res) => {
   }
 };
 
+/**
+ * DELETE /api/v1/customer/etsy/listings/:listingId/images/:imageId
+ * Delete a specific image from an Etsy listing.
+ */
+const deleteListingImage = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId, imageId } = req.params;
+
+    const result = await etsyApi.authenticatedRequest(shop, 'DELETE',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/images/${imageId}`
+    );
+
+    if (!result.success) {
+      log.error('Image delete failed:', result.error);
+      return res.status(502).json({ success: false, message: result.error || 'Failed to delete image' });
+    }
+
+    return res.json({ success: true, message: 'Image deleted successfully' });
+  } catch (error) {
+    log.error('Delete listing image error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to delete image' });
+  }
+};
+
+/**
+ * POST /api/v1/customer/etsy/listings/:listingId/videos
+ * Upload a video to an Etsy listing.
+ */
+const uploadListingVideo = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No video file provided' });
+    }
+
+    const blob = new Blob([req.file.buffer], { type: req.file.mimetype });
+    const formData = new FormData();
+    formData.append('video', blob, req.file.originalname);
+    formData.append('name', req.file.originalname);
+
+    const result = await etsyApi.authenticatedRequest(shop, 'POST',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/videos`,
+      { formData }
+    );
+
+    if (!result.success) {
+      log.error('Video upload failed:', result.error);
+      return res.status(502).json({ success: false, message: result.error || 'Failed to upload video' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Video uploaded successfully',
+      data: {
+        video_id: result.data?.video_id,
+        thumbnail_url: result.data?.thumbnail_url || '',
+        video_url: result.data?.video_url || '',
+        video_state: result.data?.video_state || 'active',
+      },
+    });
+  } catch (error) {
+    log.error('Upload listing video error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to upload video' });
+  }
+};
+
+/**
+ * DELETE /api/v1/customer/etsy/listings/:listingId/videos/:videoId
+ * Delete a specific video from an Etsy listing.
+ */
+const deleteListingVideo = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId, videoId } = req.params;
+
+    const result = await etsyApi.authenticatedRequest(shop, 'DELETE',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/videos/${videoId}`
+    );
+
+    if (!result.success) {
+      log.error('Video delete failed:', result.error);
+      return res.status(502).json({ success: false, message: result.error || 'Failed to delete video' });
+    }
+
+    return res.json({ success: true, message: 'Video deleted successfully' });
+  } catch (error) {
+    log.error('Delete listing video error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to delete video' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
@@ -1006,7 +1128,10 @@ module.exports = {
   createListing,
   updateListing,
   uploadListingImage,
+  deleteListingImage,
   uploadListingFile,
+  uploadListingVideo,
+  deleteListingVideo,
   publishListing,
   getTaxonomyProperties,
   setListingProperties,
