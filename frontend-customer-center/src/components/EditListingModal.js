@@ -25,11 +25,11 @@ const WHO_MADE_OPTIONS = [
 
 const WHEN_MADE_OPTIONS = [
   { value: 'made_to_order', label: 'Made to order' },
-  { value: '2020_2025', label: '2020 – 2025' },
+  { value: '2020_2026', label: '2020 – 2026' },
   { value: '2010_2019', label: '2010 – 2019' },
-  { value: '2004_2009', label: '2004 – 2009' },
-  { value: 'before_2004', label: 'Before 2004' },
-  { value: '2000_2003', label: '2000 – 2003' },
+  { value: '2007_2009', label: '2007 – 2009' },
+  { value: 'before_2007', label: 'Before 2007' },
+  { value: '2000_2006', label: '2000 – 2006' },
   { value: '1990s', label: '1990s' },
   { value: '1980s', label: '1980s' },
   { value: '1970s', label: '1970s' },
@@ -66,6 +66,9 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const replaceInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const [replaceIndex, setReplaceIndex] = useState(null);
+  const [mediaChanged, setMediaChanged] = useState(false);
+  const [imageOrderChanged, setImageOrderChanged] = useState(false);
+  const [dragIndex, setDragIndex] = useState(null);
 
   // Load listing data when modal opens
   useEffect(() => {
@@ -150,6 +153,9 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     setTaxonomyProperties([]);
     setPropertyValues([]);
     setReplaceIndex(null);
+    setMediaChanged(false);
+    setImageOrderChanged(false);
+    setDragIndex(null);
   };
 
   // --- Image handlers ---
@@ -160,6 +166,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       const res = await etsyApi.uploadListingImage(listingId, file);
       if (res.success) {
         message.success('Image uploaded');
+        setMediaChanged(true);
         // Refresh listing to get updated images
         const refreshed = await etsyApi.getListingById(listingId);
         setExistingImages(refreshed.data?.images || []);
@@ -180,6 +187,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       const res = await etsyApi.deleteListingImage(listingId, imageId);
       if (res.success) {
         message.success('Image deleted');
+        setMediaChanged(true);
         setExistingImages(prev => prev.filter(img => img.listing_image_id !== imageId));
       } else {
         message.error(res.message || 'Delete failed');
@@ -199,6 +207,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       await etsyApi.deleteListingImage(listingId, imageToReplace.listing_image_id);
       await etsyApi.uploadListingImage(listingId, file);
       message.success('Image replaced');
+      setMediaChanged(true);
       // Refresh listing to get updated images
       const refreshed = await etsyApi.getListingById(listingId);
       setExistingImages(refreshed.data?.images || []);
@@ -232,6 +241,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       const res = await etsyApi.uploadListingVideo(listingId, file);
       if (res.success) {
         message.success('Video uploaded — it may take a few minutes to process on Etsy');
+        setMediaChanged(true);
         if (res.data) {
           setExistingVideos(prev => [...prev, res.data]);
         }
@@ -252,6 +262,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       const res = await etsyApi.deleteListingVideo(listingId, videoId);
       if (res.success) {
         message.success('Video deleted');
+        setMediaChanged(true);
         setExistingVideos(prev => prev.filter(v => v.video_id !== videoId));
       } else {
         message.error(res.message || 'Delete failed');
@@ -350,14 +361,19 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
             values: val.values || [],
           }));
 
-        if (propsToSet.length === 0) {
+        if (propsToSet.length === 0 && !mediaChanged && !imageOrderChanged) {
           message.info('No changes detected');
           setLoading(false);
           return;
         }
       }
 
-      // Update listing fields
+      // Include image_ids for reordering if image order changed
+      if (imageOrderChanged && existingImages.length > 0) {
+        payload.imageIds = existingImages.map(img => img.listing_image_id);
+      }
+
+      // Update listing fields (and/or image order)
       if (Object.keys(payload).length > 0) {
         const updateRes = await etsyApi.updateListing(listingId, payload);
         if (!updateRes.success) {
@@ -504,7 +520,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
 
           <Form.Item
             name="materials"
-            label={<span>Materials <Text type="secondary" style={{ fontSize: 12 }}>(optional)</Text></span>}
+            label="Materials"
           >
             <Select
               mode="tags"
@@ -528,13 +544,39 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
               {Array.from({ length: MAX_IMAGES }).map((_, i) => {
                 const img = existingImages[i];
                 if (img) {
-                  // Filled slot — show image with overlay actions
+                  // Filled slot — show image with overlay actions + drag to reorder
                   return (
-                    <div key={img.listing_image_id || i} style={{
-                      position: 'relative', width: '100%', aspectRatio: '1',
-                      borderRadius: 8, overflow: 'hidden',
-                      border: `2px solid ${borderColor}`,
-                    }}>
+                    <div
+                      key={img.listing_image_id || i}
+                      draggable
+                      onDragStart={(e) => {
+                        setDragIndex(i);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragIndex === null || dragIndex === i) return;
+                        const reordered = [...existingImages];
+                        const [moved] = reordered.splice(dragIndex, 1);
+                        reordered.splice(i, 0, moved);
+                        setExistingImages(reordered);
+                        setImageOrderChanged(true);
+                        setDragIndex(null);
+                      }}
+                      onDragEnd={() => setDragIndex(null)}
+                      style={{
+                        position: 'relative', width: '100%', aspectRatio: '1',
+                        borderRadius: 8, overflow: 'hidden',
+                        border: dragIndex === i ? `2px solid ${BRAND}` : `2px solid ${borderColor}`,
+                        opacity: dragIndex === i ? 0.5 : 1,
+                        cursor: 'grab',
+                        transition: 'border-color 0.2s, opacity 0.2s',
+                      }}
+                    >
                       <img
                         src={img.url_170x135 || img.url_75x75 || img.url}
                         alt={`Listing ${i + 1}`}
@@ -631,7 +673,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
               onChange={onReplaceImageFile}
             />
             <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
-              Etsy allows up to 10 photos. Supported: JPG, PNG, GIF, WebP.
+              Etsy allows up to 10 photos. Supported: JPG, PNG, GIF, WebP. Drag images to reorder.
             </Text>
           </div>
 

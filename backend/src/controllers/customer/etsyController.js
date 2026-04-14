@@ -907,23 +907,27 @@ const updateListing = async (req, res) => {
     const {
       title, description, price, quantity, taxonomyId,
       whoMade, whenMade, isSupply, shippingProfileId,
-      tags, materials,
+      tags, materials, imageIds,
       isPersonalizable, personalizationIsRequired,
       personalizationCharCountMax, personalizationInstructions,
     } = req.body;
 
-    // Build body with only provided (non-undefined) fields
+    // Build PATCH body — quantity and price are NOT supported by Etsy PATCH listing.
+    // They must be updated via the Inventory API (PUT /listings/{id}/inventory).
     const body = {};
 
     if (title !== undefined) body.title = title.trim();
     if (description !== undefined) body.description = description.trim();
-    if (price !== undefined) body.price = parseFloat(price);
-    if (quantity !== undefined) body.quantity = parseInt(quantity, 10);
     if (taxonomyId !== undefined) body.taxonomy_id = parseInt(taxonomyId, 10);
     if (whoMade !== undefined) body.who_made = whoMade;
     if (whenMade !== undefined) body.when_made = whenMade;
     if (isSupply !== undefined) body.is_supply = isSupply === true;
     if (shippingProfileId !== undefined) body.shipping_profile_id = parseInt(shippingProfileId, 10);
+
+    // Image reordering — pass image_ids to set new image order
+    if (imageIds !== undefined && Array.isArray(imageIds) && imageIds.length > 0) {
+      body.image_ids = imageIds.map(id => parseInt(id, 10));
+    }
 
     // Tags (max 13)
     if (tags !== undefined) {
@@ -945,46 +949,109 @@ const updateListing = async (req, res) => {
       }
     }
 
-    if (Object.keys(body).length === 0) {
+    const needsInventoryUpdate = price !== undefined || quantity !== undefined;
+
+    if (Object.keys(body).length === 0 && !needsInventoryUpdate) {
       return res.status(400).json({ success: false, message: 'No fields provided to update' });
     }
 
-    log.info(`Updating listing ${listingId} on Etsy for shop ${shop.shopId}: ${Object.keys(body).join(', ')}`);
+    let updated = null;
 
-    const result = await etsyApi.authenticatedRequest(shop, 'PATCH',
-      `/v3/application/shops/${shop.shopId}/listings/${listingId}`,
-      { body }
-    );
+    // PATCH listing fields (title, desc, tags, etc.)
+    if (Object.keys(body).length > 0) {
+      log.info(`Updating listing ${listingId} on Etsy for shop ${shop.shopId}: ${Object.keys(body).join(', ')}`);
 
-    if (!result.success) {
-      log.error('Etsy update listing failed:', result.error);
+      const result = await etsyApi.authenticatedRequest(shop, 'PATCH',
+        `/v3/application/shops/${shop.shopId}/listings/${listingId}`,
+        { body }
+      );
 
-      if (result.status === 404 || (result.error && String(result.error).toLowerCase().includes('not found'))) {
-        await EtsyListing.deleteOne({ shopId: shop._id, etsyListingId: String(listingId) }).catch(() => {});
-        return res.status(404).json({
+      if (!result.success) {
+        log.error('Etsy update listing failed:', result.error);
+
+        if (result.status === 404 || (result.error && String(result.error).toLowerCase().includes('not found'))) {
+          await EtsyListing.deleteOne({ shopId: shop._id, etsyListingId: String(listingId) }).catch(() => {});
+          return res.status(404).json({
+            success: false,
+            message: 'This listing no longer exists on Etsy. It has been removed from your dashboard.',
+          });
+        }
+
+        return res.status(502).json({
           success: false,
-          message: 'This listing no longer exists on Etsy. It has been removed from your dashboard.',
+          message: result.error || 'Failed to update listing on Etsy',
         });
       }
 
-      return res.status(502).json({
-        success: false,
-        message: result.error || 'Failed to update listing on Etsy',
-      });
+      updated = result.data;
     }
 
-    const updated = result.data;
+    // Update price/quantity via Inventory API
+    if (needsInventoryUpdate) {
+      log.info(`Updating inventory for listing ${listingId}: price=${price}, quantity=${quantity}`);
+
+      try {
+        // Fetch current inventory
+        const invResult = await etsyApi.authenticatedRequest(shop, 'GET',
+          `/v3/application/listings/${listingId}/inventory`
+        );
+
+        if (!invResult.success || !invResult.data?.products?.length) {
+          log.error('Failed to fetch inventory for listing', listingId);
+          return res.status(502).json({ success: false, message: 'Failed to fetch listing inventory from Etsy' });
+        }
+
+        const invData = invResult.data;
+        // Update offerings in the first product (simple listings without variations)
+        const products = invData.products.map(product => ({
+          sku: product.sku || '',
+          property_values: product.property_values || [],
+          offerings: product.offerings.map(offering => ({
+            price: price !== undefined ? parseFloat(price) : (offering.price.amount / offering.price.divisor),
+            quantity: quantity !== undefined ? parseInt(quantity, 10) : offering.quantity,
+            is_enabled: offering.is_enabled !== false,
+          })),
+        }));
+
+        const invUpdateResult = await etsyApi.authenticatedRequest(shop, 'PUT',
+          `/v3/application/listings/${listingId}/inventory`,
+          {
+            body: {
+              products,
+              price_on_property: invData.price_on_property || [],
+              quantity_on_property: invData.quantity_on_property || [],
+              sku_on_property: invData.sku_on_property || [],
+            },
+          }
+        );
+
+        if (!invUpdateResult.success) {
+          log.error('Etsy inventory update failed:', invUpdateResult.error);
+          return res.status(502).json({
+            success: false,
+            message: invUpdateResult.error || 'Failed to update price/quantity on Etsy',
+          });
+        }
+
+        log.info(`Inventory updated for listing ${listingId}`);
+      } catch (invErr) {
+        log.error('Inventory update error:', invErr.message);
+        return res.status(502).json({ success: false, message: 'Failed to update price/quantity' });
+      }
+    }
 
     // Update local DB
     const dbUpdate = {};
-    if (updated.title) dbUpdate.title = updated.title;
-    if (updated.description) dbUpdate.description = updated.description;
-    if (updated.tags) dbUpdate.tags = updated.tags;
-    if (updated.materials) dbUpdate.materials = updated.materials;
-    if (updated.price?.amount != null) dbUpdate.price = updated.price.amount / updated.price.divisor;
-    if (updated.quantity != null) dbUpdate.quantity = updated.quantity;
-    if (updated.taxonomy_id) dbUpdate.taxonomyId = updated.taxonomy_id;
-    if (updated.state) dbUpdate.state = updated.state;
+    if (updated) {
+      if (updated.title) dbUpdate.title = updated.title;
+      if (updated.description) dbUpdate.description = updated.description;
+      if (updated.tags) dbUpdate.tags = updated.tags;
+      if (updated.materials) dbUpdate.materials = updated.materials;
+      if (updated.taxonomy_id) dbUpdate.taxonomyId = updated.taxonomy_id;
+      if (updated.state) dbUpdate.state = updated.state;
+    }
+    if (price !== undefined) dbUpdate.price = parseFloat(price);
+    if (quantity !== undefined) dbUpdate.quantity = parseInt(quantity, 10);
     dbUpdate.syncedAt = new Date();
 
     await EtsyListing.updateOne(
@@ -998,9 +1065,9 @@ const updateListing = async (req, res) => {
       success: true,
       message: 'Listing updated successfully',
       data: {
-        listingId: updated.listing_id || listingId,
-        title: updated.title,
-        state: updated.state,
+        listingId: (updated && updated.listing_id) || listingId,
+        title: updated?.title || listing.title,
+        state: updated?.state || listing.state,
         url: `https://www.etsy.com/listing/${listingId}`,
       },
     });
