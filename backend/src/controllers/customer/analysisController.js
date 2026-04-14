@@ -541,17 +541,110 @@ function generateTitleSuggestion(title, category, titleScore, competitors) {
     parts.push('Include your main category keyword in the title for better search matching');
   }
 
-  // Build an optimized title using competitor keywords if current title needs work
+  // ── Build an intelligently optimized title ──
   let optimized = title;
-  if (len < 80 && missingKeywords.length > 0) {
-    // Reconstruct: append relevant competitor keywords using " | " separator
-    const additions = missingKeywords.slice(0, 3).map(k => capitalize(k.word));
-    const proposed = title.replace(/\s*\|\s*$/, '') + ' | ' + additions.join(' | ');
-    if (proposed.length <= 140) {
+
+  if (competitors.length > 0) {
+    // Analyze the top-performing competitor titles for structural patterns
+    const topTitles = competitors.slice(0, 5).map(c => c.title);
+
+    // Parse the original title into semantic segments (split on common separators)
+    const segments = title
+      .split(/\s*[|–—,]\s*/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    // Identify the primary product descriptor (usually the longest/first segment)
+    const primarySegment = segments[0] || title;
+
+    // Extract the category-relevant core from competitor titles
+    // Find multi-word phrases from competitors (2-3 word combos) not in our title
+    const competitorPhrases = extractCompetitorPhrases(topTitles, titleLower);
+
+    // Gather additional useful descriptors from competitors
+    const descriptorPatterns = extractDescriptorPatterns(topTitles);
+
+    // Build the optimized title by weaving in missing elements naturally
+    const optimizedParts = [primarySegment];
+
+    // Add remaining user segments that aren't redundant
+    for (let i = 1; i < segments.length; i++) {
+      if (segments[i].length > 2) optimizedParts.push(segments[i]);
+    }
+
+    // Weave in the most relevant competitor phrases (not just single words)
+    const addedWords = new Set(titleLower.split(/\s+/));
+    let currentLen = optimizedParts.join(' – ').length;
+
+    for (const phrase of competitorPhrases) {
+      if (currentLen >= 130) break;
+      // Skip if most words in this phrase are already in the title
+      const phraseWords = phrase.toLowerCase().split(/\s+/);
+      const newWords = phraseWords.filter(w => !addedWords.has(w) && w.length > 2);
+      if (newWords.length === 0) continue;
+
+      optimizedParts.push(phrase);
+      phraseWords.forEach(w => addedWords.add(w));
+      currentLen = optimizedParts.join(' – ').length;
+    }
+
+    // If still short, add high-value single descriptors from competitors
+    if (currentLen < 80 && missingKeywords.length > 0) {
+      // Filter out generic filler words that don't add search value
+      const fillerWords = new Set(['file', 'item', 'product', 'listing', 'lot', 'pcs', 'piece']);
+      const valuableKeywords = missingKeywords.filter(k => !fillerWords.has(k.word));
+      // Fall back to original list if all were filtered
+      const kwPool = valuableKeywords.length > 0 ? valuableKeywords : missingKeywords;
+
+      for (const kw of kwPool) {
+        if (currentLen >= 130) break;
+        if (addedWords.has(kw.word)) continue;
+
+        // Try to find a natural descriptor pattern for this keyword
+        const pattern = descriptorPatterns.find(p =>
+          p.toLowerCase().includes(kw.word) && !titleLower.includes(p.toLowerCase())
+        );
+        if (pattern && currentLen + pattern.length + 3 <= 140) {
+          optimizedParts.push(pattern);
+          pattern.toLowerCase().split(/\s+/).forEach(w => addedWords.add(w));
+        } else {
+          optimizedParts.push(capitalize(kw.word));
+          addedWords.add(kw.word);
+        }
+        currentLen = optimizedParts.join(' – ').length;
+      }
+    }
+
+    // Join with a natural separator that matches Etsy conventions
+    // Analyze what separator the top competitors use most
+    const sepCounts = { comma: 0, pipe: 0, dash: 0, ndash: 0 };
+    for (const t of topTitles) {
+      if (t.includes(',')) sepCounts.comma++;
+      if (t.includes('|')) sepCounts.pipe++;
+      if (t.includes(' - ')) sepCounts.dash++;
+      if (/[–—]/.test(t)) sepCounts.ndash++;
+    }
+
+    let sep = ', ';
+    const maxSep = Math.max(sepCounts.comma, sepCounts.pipe, sepCounts.dash, sepCounts.ndash);
+    if (maxSep === sepCounts.pipe && sepCounts.pipe > 0) sep = ' | ';
+    else if (maxSep === sepCounts.ndash && sepCounts.ndash > 0) sep = ' – ';
+    else if (maxSep === sepCounts.dash && sepCounts.dash > 0) sep = ' - ';
+
+    // Reconstruct using the detected separator
+    const proposed = optimizedParts.join(sep);
+
+    if (proposed.length <= 140 && proposed !== title) {
       optimized = proposed;
-    } else {
-      // Trim to fit
-      optimized = proposed.substring(0, 137) + '...';
+    } else if (proposed.length > 140) {
+      // Trim gracefully at the last complete segment that fits
+      let trimmed = optimizedParts[0];
+      for (let i = 1; i < optimizedParts.length; i++) {
+        const candidate = trimmed + sep + optimizedParts[i];
+        if (candidate.length > 138) break;
+        trimmed = candidate;
+      }
+      optimized = trimmed;
     }
   }
 
@@ -560,6 +653,71 @@ function generateTitleSuggestion(title, category, titleScore, competitors) {
   }
 
   return { optimized, reasoning: parts.join('. ') + '.' };
+}
+
+/**
+ * Extract meaningful multi-word phrases from competitor titles
+ * that are not present in the user's title.
+ */
+function extractCompetitorPhrases(competitorTitles, userTitleLower) {
+  const phraseCounts = new Map();
+  const total = competitorTitles.length;
+
+  for (const ct of competitorTitles) {
+    const words = ct.replace(/[|,\-–—()[\]{}]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+    const seen = new Set();
+
+    // Extract 2-word and 3-word phrases
+    for (let n = 2; n <= 3; n++) {
+      for (let i = 0; i <= words.length - n; i++) {
+        const phrase = words.slice(i, i + n).join(' ');
+        const phraseLower = phrase.toLowerCase();
+        if (!seen.has(phraseLower) && !userTitleLower.includes(phraseLower)) {
+          seen.add(phraseLower);
+          const entry = phraseCounts.get(phraseLower) || { phrase, count: 0 };
+          entry.count++;
+          phraseCounts.set(phraseLower, entry);
+        }
+      }
+    }
+  }
+
+  // Only keep phrases used by 40%+ of competitors
+  return Array.from(phraseCounts.values())
+    .filter(p => p.count / total >= 0.4)
+    .sort((a, b) => b.count - a.count || b.phrase.length - a.phrase.length)
+    .slice(0, 5)
+    .map(p => p.phrase.split(' ').map(w => capitalize(w)).join(' '));
+}
+
+/**
+ * Extract natural descriptor patterns from competitor titles.
+ * Returns phrases like "3 Sizes", "Instant Download", "Digital File", etc.
+ */
+function extractDescriptorPatterns(competitorTitles) {
+  const patterns = new Map();
+  const total = competitorTitles.length;
+
+  for (const ct of competitorTitles) {
+    // Split on separators to get natural segments
+    const segments = ct.split(/\s*[|,\-–—]\s*/).map(s => s.trim()).filter(s => s.length > 2 && s.length < 30);
+    const seen = new Set();
+    for (const seg of segments) {
+      const segLower = seg.toLowerCase();
+      if (!seen.has(segLower)) {
+        seen.add(segLower);
+        const entry = patterns.get(segLower) || { text: seg, count: 0 };
+        entry.count++;
+        patterns.set(segLower, entry);
+      }
+    }
+  }
+
+  return Array.from(patterns.values())
+    .filter(p => p.count >= 2 && p.count / total >= 0.3)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+    .map(p => p.text);
 }
 
 function capitalize(str) {
