@@ -420,8 +420,12 @@ const getCustomerUsageAnalytics = async (req, res) => {
       { $sort: { count: -1 } }
     ]);
 
-    // Feature usage with plan limits (merge UsageLog data with planSnapshot features)
-    const planFeatures = customer.planSnapshot?.features || [];
+    // Feature usage with plan limits — use LIVE plan features (not stale snapshot)
+    let planFeatures = customer.planSnapshot?.features || [];
+    if (customer.currentPlan) {
+      const livePlan = await Plan.findById(customer.currentPlan).select('features').lean();
+      if (livePlan?.features) planFeatures = livePlan.features;
+    }
     const featureUsageDetails = planFeatures
       .filter(f => f.enabled)
       .map(f => {
@@ -737,7 +741,14 @@ const getCustomerById = async (req, res) => {
     try {
       const { UsageLog } = require('../../models/subscription');
       const usageSummary = await UsageLog.getCustomerUsageSummary(customer._id);
-      const planFeatures = customer.planSnapshot?.features || [];
+
+      // Use LIVE plan features as source of truth (not stale snapshot)
+      let planFeatures = customer.planSnapshot?.features || [];
+      if (customer.currentPlan) {
+        const livePlan = await Plan.findById(customer.currentPlan).select('features').lean();
+        if (livePlan?.features) planFeatures = livePlan.features;
+      }
+
       featureUsage = planFeatures
         .filter(f => f.enabled)
         .map(f => {

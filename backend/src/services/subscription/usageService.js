@@ -145,11 +145,9 @@ const checkUsage = async (user, featureKey) => {
  * Returns array of { featureKey, featureName, limit, used, remaining, unlimited, percentage }
  */
 const getRemainingUsage = async (user) => {
-  const planFeatures = user.planSnapshot?.features || [];
-  const enabledFeatures = planFeatures.filter((f) => f.enabled);
   const periodStart = getBillingPeriodStart(user);
 
-  // Fetch live plan for up-to-date limits
+  // Use LIVE plan features as source of truth (not stale snapshot)
   let livePlanFeatures = null;
   const planId = user.planSnapshot?.planId;
   if (planId) {
@@ -157,12 +155,13 @@ const getRemainingUsage = async (user) => {
     livePlanFeatures = livePlan?.features || null;
   }
 
+  const sourceFeatures = livePlanFeatures || user.planSnapshot?.features || [];
+  const enabledFeatures = sourceFeatures.filter((f) => f.enabled);
+
   const results = [];
 
   for (const feature of enabledFeatures) {
-    // For any feature, prefer live plan limit over stale snapshot
-    const liveFeature = livePlanFeatures?.find(f => f.featureKey === feature.featureKey);
-    const liveLimit = liveFeature?.limit !== undefined ? liveFeature.limit : feature.limit;
+    const limit = feature.limit;
 
     // Special handling for connect_shops — count actual EtsyShop records, not UsageLog
     if (feature.featureKey === 'connect_shops') {
@@ -170,7 +169,6 @@ const getRemainingUsage = async (user) => {
         userId: user._id,
         status: { $ne: 'disconnected' },
       });
-      const limit = liveLimit;
       const isUnlimited = limit === null || limit === undefined || limit === -1;
       results.push({
         featureKey: feature.featureKey,
@@ -184,7 +182,7 @@ const getRemainingUsage = async (user) => {
       continue;
     }
 
-    if (liveLimit === null || liveLimit === undefined) {
+    if (limit === null || limit === undefined) {
       results.push({
         featureKey: feature.featureKey,
         featureName: feature.featureName,
@@ -205,11 +203,11 @@ const getRemainingUsage = async (user) => {
       results.push({
         featureKey: feature.featureKey,
         featureName: feature.featureName,
-        limit: liveLimit,
+        limit,
         used,
-        remaining: Math.max(0, liveLimit - used),
+        remaining: Math.max(0, limit - used),
         unlimited: false,
-        percentage: liveLimit > 0 ? Math.round((used / liveLimit) * 100) : 0,
+        percentage: limit > 0 ? Math.round((used / limit) * 100) : 0,
       });
     }
   }

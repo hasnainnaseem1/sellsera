@@ -66,8 +66,16 @@ const checkFeatureAccess = (featureKey) => {
 
         log.warn(`Subscription not active (${status || 'none'}): ${user.email} — enforcing Free tier for ${featureKey}`);
       } else {
-        // Active/trial/past_due — use their plan snapshot
-        planFeatures = user.planSnapshot?.features || [];
+        // Active/trial/past_due — use LIVE plan features (not stale snapshot)
+        // This ensures newly added features are picked up without re-assigning plans
+        const planId = user.planSnapshot?.planId || user.currentPlan;
+        if (planId) {
+          const Plan = require('../../models/subscription/Plan');
+          const livePlan = await Plan.findById(planId).select('features').lean();
+          planFeatures = livePlan?.features || user.planSnapshot?.features || [];
+        } else {
+          planFeatures = user.planSnapshot?.features || [];
+        }
       }
 
       // Find this feature in the customer's plan

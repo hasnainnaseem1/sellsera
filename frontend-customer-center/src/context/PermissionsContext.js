@@ -46,6 +46,7 @@ export const PermissionsProvider = ({ children }) => {
           used:    0,
           remaining: f.limit,
           unlimited: f.limit === null || f.limit === undefined || f.limit === -1,
+          featureName: f.featureName || f.featureKey,
         };
       });
 
@@ -58,6 +59,10 @@ export const PermissionsProvider = ({ children }) => {
           // Update limit from usage response (has live plan data)
           if (u.limit !== undefined) {
             featureMap[u.featureKey].limit = u.limit;
+          }
+          // Update featureName if available from usage response
+          if (u.featureName) {
+            featureMap[u.featureKey].featureName = u.featureName;
           }
         }
       });

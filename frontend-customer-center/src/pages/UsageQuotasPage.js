@@ -51,7 +51,7 @@ const UsageQuotasPage = () => {
       const pct = f.unlimited ? 0 : f.limit ? Math.round((f.used / f.limit) * 100) : 0;
       return {
         key,
-        label: featureLabels[key] || key,
+        label: featureLabels[key] || f.featureName || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         used: f.used || 0,
         limit: f.limit,
         unlimited: f.unlimited,

@@ -14,7 +14,7 @@ const getSubscription = async (req, res) => {
   try {
     const user = req.user;
 
-    // Fetch live plan for up-to-date limits
+    // Fetch live plan for up-to-date features & limits
     let livePlanFeatures = null;
     const planId = user.planSnapshot?.planId;
     if (planId) {
@@ -22,17 +22,17 @@ const getSubscription = async (req, res) => {
       livePlanFeatures = livePlan?.features || null;
     }
 
-    const planFeatures = (user.planSnapshot?.features || [])
+    // Use LIVE plan features as source of truth (new features added to plan are picked up)
+    // Fall back to planSnapshot only if live plan is unavailable
+    const sourceFeatures = livePlanFeatures || user.planSnapshot?.features || [];
+    const planFeatures = sourceFeatures
       .filter((f) => f.enabled)
       .map((f) => {
-        // Use live plan limit if available
-        const liveFeature = livePlanFeatures?.find(lf => lf.featureKey === f.featureKey);
-        const limit = liveFeature?.limit !== undefined ? liveFeature.limit : f.limit;
         return {
           featureKey: f.featureKey,
           featureName: f.featureName,
-          type: limit !== null && limit !== undefined ? 'numeric' : 'boolean',
-          limit,
+          type: f.limit !== null && f.limit !== undefined ? 'numeric' : 'boolean',
+          limit: f.limit,
         };
       });
 
