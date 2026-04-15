@@ -73,6 +73,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const [mediaChanged, setMediaChanged] = useState(false);
   const [imageOrderChanged, setImageOrderChanged] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
+  const [isDigital, setIsDigital] = useState(false);
 
   // Load listing data when modal opens
   useEffect(() => {
@@ -82,6 +83,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       .then(res => {
         const d = res.data;
         setListingData(d);
+        setIsDigital(d.isDigital || false);
         setExistingImages(d.images || []);
         setExistingVideos(d.videos || []);
 
@@ -123,13 +125,13 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
 
   // Load shipping profiles
   useEffect(() => {
-    if (!open || listingData?.isDigital) return;
+    if (!open || isDigital) return;
     setShippingLoading(true);
     etsyApi.getShippingProfiles()
       .then(res => setShippingProfiles(res.data || []))
       .catch(() => {})
       .finally(() => setShippingLoading(false));
-  }, [open, listingData?.isDigital]);
+  }, [open, isDigital]);
 
   const loadTaxonomyProperties = async (taxonomyId) => {
     if (!taxonomyId) return;
@@ -168,6 +170,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     setMediaChanged(false);
     setImageOrderChanged(false);
     setDragIndex(null);
+    setIsDigital(false);
   };
 
   // --- Image handlers ---
@@ -327,6 +330,13 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     e.target.value = '';
   };
 
+  const handleDigitalChange = (checked) => {
+    setIsDigital(checked);
+    if (checked) {
+      form.setFieldValue('shippingProfileId', undefined);
+    }
+  };
+
   const handleClose = () => {
     resetForm();
     onClose();
@@ -338,7 +348,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
         await form.validateFields(['title', 'description', 'tags']);
       } else if (step === 1) {
         const fieldsToValidate = ['price', 'quantity', 'whoMade', 'whenMade'];
-        if (!listingData?.isDigital) fieldsToValidate.push('shippingProfileId');
+        if (!isDigital) fieldsToValidate.push('shippingProfileId');
         await form.validateFields(fieldsToValidate);
       }
       setStep(s => s + 1);
@@ -375,8 +385,13 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       const newMats = (values.materials || []).sort().join(',');
       if (newMats !== oldMats) payload.materials = values.materials || [];
 
+      // Digital type change
+      if (isDigital !== (listingData.isDigital || false)) {
+        payload.isDigital = isDigital;
+      }
+
       // Shipping profile (physical only) — normalize both sides to avoid null vs undefined mismatch
-      if (!listingData.isDigital && (values.shippingProfileId || null) !== (listingData.shippingProfileId || null)) {
+      if (!isDigital && (values.shippingProfileId || null) !== (listingData.shippingProfileId || null)) {
         payload.shippingProfileId = values.shippingProfileId;
       }
 
@@ -850,7 +865,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
           </div>
 
           {/* Digital Files Section */}
-          {listingData?.isDigital && (
+          {isDigital && (
             <>
               <Divider style={{ margin: '16px 0 12px' }} />
               <div style={{ marginBottom: 8 }}>
@@ -928,17 +943,25 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
       title: 'Pricing & Shipping',
       content: (
         <>
-          {listingData?.isDigital && (
-            <div style={{
-              background: cardBg, borderRadius: radii.sm, padding: 12,
-              border: `1px solid ${borderColor}`, marginBottom: 16,
-            }}>
-              <Tag color="blue">Digital Product</Tag>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Buyers receive downloadable files
-              </Text>
+          <div style={{
+            background: cardBg, borderRadius: radii.sm, padding: 16,
+            border: `1px solid ${borderColor}`, marginBottom: 20,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+              <Text strong>Digital Product</Text>
+              <Switch
+                checked={isDigital}
+                onChange={handleDigitalChange}
+                checkedChildren="Yes"
+                unCheckedChildren="No"
+              />
             </div>
-          )}
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {isDigital
+                ? 'Buyers will receive a downloadable file — no shipping required'
+                : 'Physical product — requires a shipping profile'}
+            </Text>
+          </div>
 
           <Row gutter={16}>
             <Col xs={24} sm={12}>
@@ -1011,7 +1034,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
             </Radio.Group>
           </Form.Item>
 
-          {!listingData?.isDigital && (
+          {!isDigital && (
             <Form.Item
               name="shippingProfileId" label="Shipping Profile"
               rules={[{ required: true, message: 'Physical products need a shipping profile' }]}

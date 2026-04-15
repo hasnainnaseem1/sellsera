@@ -395,7 +395,7 @@ const getListingById = async (req, res) => {
           // Update DB cache so future loads are faster
           await EtsyListing.updateOne(
             { shopId: shop._id, etsyListingId: listing.etsyListingId },
-            { $set: { images: liveImages.map(i => ({ url: i.url, rank: i.rank })), isDigital: !!ld.is_digital } }
+            { $set: { images: liveImages.map(i => ({ url: i.url, rank: i.rank })) } }
           ).catch(() => {});
         }
         // Extract videos
@@ -407,8 +407,14 @@ const getListingById = async (req, res) => {
             video_state: v.video_state || 'active',
           }));
         }
-        // Digital status
-        if (ld.is_digital !== undefined) isDigital = ld.is_digital;
+        // Digital status — always persist to DB so cached value stays accurate
+        if (ld.is_digital !== undefined) {
+          isDigital = ld.is_digital;
+          await EtsyListing.updateOne(
+            { shopId: shop._id, etsyListingId: listing.etsyListingId },
+            { $set: { isDigital: !!ld.is_digital } }
+          ).catch(() => {});
+        }
         // Digital products don't need shipping
         if (ld.is_digital) {
           shippingProfile = { freeShipping: true, processingDays: null };
@@ -977,7 +983,7 @@ const updateListing = async (req, res) => {
 
     const {
       title, description, price, quantity, taxonomyId,
-      whoMade, whenMade, isSupply, shippingProfileId,
+      whoMade, whenMade, isDigital, isSupply, shippingProfileId,
       tags, materials, imageIds, state, featured_rank,
       isPersonalizable, personalizationIsRequired,
       personalizationCharCountMax, personalizationInstructions,
@@ -992,6 +998,7 @@ const updateListing = async (req, res) => {
     if (taxonomyId !== undefined) body.taxonomy_id = parseInt(taxonomyId, 10);
     if (whoMade !== undefined) body.who_made = whoMade;
     if (whenMade !== undefined) body.when_made = whenMade;
+    if (isDigital !== undefined) body.type = isDigital ? 'download' : 'physical';
     if (isSupply !== undefined) body.is_supply = isSupply === true;
     if (shippingProfileId !== undefined) body.shipping_profile_id = parseInt(shippingProfileId, 10);
 
@@ -1138,6 +1145,7 @@ const updateListing = async (req, res) => {
       if (updated.state) dbUpdate.state = updated.state;
       if (updated.featured_rank !== undefined) dbUpdate.featuredRank = updated.featured_rank;
     }
+    if (isDigital !== undefined) dbUpdate.isDigital = isDigital === true;
     if (price !== undefined) dbUpdate.price = parseFloat(price);
     if (quantity !== undefined) dbUpdate.quantity = parseInt(quantity, 10);
     dbUpdate.syncedAt = new Date();
