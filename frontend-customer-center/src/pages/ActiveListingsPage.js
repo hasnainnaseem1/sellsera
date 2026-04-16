@@ -42,7 +42,7 @@ const ActiveListingsPage = () => {
   const [syncing, setSyncing] = useState(false);
   const [deactivating, setDeactivating] = useState(null);
   const [reactivating, setReactivating] = useState(null);
-  const [featuring, setFeaturing] = useState(null);
+
 
   const handleFileUpload = (listingId, autoPublish = false) => {
     return new Promise((resolve) => {
@@ -129,32 +129,6 @@ const ActiveListingsPage = () => {
       message.error(err?.response?.data?.message || 'Failed to reactivate listing');
     } finally {
       setReactivating(null);
-    }
-  };
-
-  const handleToggleFeatured = async (listingId, currentRank) => {
-    const isFeatured = currentRank > 0;
-    if (!isFeatured) {
-      // Check max 4 featured
-      const featuredCount = listings.filter(l => l.featuredRank > 0).length;
-      if (featuredCount >= 4) {
-        message.warning('You can only feature up to 4 listings at a time');
-        return;
-      }
-    }
-    const newRank = isFeatured ? 0 : 1;
-    setFeaturing(listingId);
-    try {
-      await etsyApi.featureListing(listingId, newRank);
-      // Optimistic UI update — reflect star change immediately
-      setListings(prev => prev.map(l =>
-        l.listingId === String(listingId) ? { ...l, featuredRank: newRank } : l
-      ));
-      message.success(isFeatured ? 'Listing unfeatured' : 'Listing featured!');
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to update featured status');
-    } finally {
-      setFeaturing(null);
     }
   };
 

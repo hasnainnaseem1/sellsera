@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Typography, Button, theme } from 'antd';
+import { Typography, Button } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,7 +12,6 @@ const BRAND = '#6C63FF';
 const DashboardBanner = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
-  const { token: tok } = theme.useToken();
   const bannerRef = useRef(null);
 
   const [dismissed, setDismissed] = useState(() => {

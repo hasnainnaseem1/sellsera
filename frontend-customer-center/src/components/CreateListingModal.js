@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Modal, Form, Input, InputNumber, Select, Switch, Button,
   Cascader, Steps, Typography, Row, Col, Divider, message, Alert, Tag, Space,
-  theme, Radio, Spin, Tooltip, Popconfirm,
+  theme, Radio, Tooltip, Popconfirm,
 } from 'antd';
 import {
   PlusOutlined, FileOutlined, PictureOutlined,
@@ -13,7 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
 import etsyApi from '../api/etsyApi';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { TextArea } = Input;
 const BRAND = '#6C63FF';
 const MAX_IMAGES = 10;
@@ -45,7 +45,6 @@ const WHEN_MADE_OPTIONS = [
 
 const CreateListingModal = ({ open, onClose, onSuccess }) => {
   const { isDark } = useTheme();
-  const { token: tok } = theme.useToken();
   const [form] = Form.useForm();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);

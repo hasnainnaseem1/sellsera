@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Typography, Row, Col, Statistic, Table, Space,
-  Empty, message, theme, Tooltip, Tag, Avatar,
+  Empty, theme, Tooltip, Tag, Avatar,
 } from 'antd';
 import {
   LineChartOutlined, RiseOutlined, FallOutlined, MinusOutlined,

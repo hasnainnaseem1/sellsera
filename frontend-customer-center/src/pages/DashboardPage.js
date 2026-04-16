@@ -46,9 +46,9 @@ if (typeof document !== 'undefined' && !document.getElementById('sellsera-pulse-
 const DashboardPage = () => {
   const { user, fetchMe, token } = useAuth();
   const { isDark } = useTheme();
-  const { siteConfig } = useSite();
+  useSite();
   const { getFeatureAccess } = usePermissions();
-  const { shops, activeShop, activeShopId, shopLimit, shopLimitUnlimited, loading: shopLoading, selectShop, refresh: refreshShops } = useShop();
+  const { shops, activeShop, shopLimit, shopLimitUnlimited, loading: shopLoading, selectShop, refresh: refreshShops } = useShop();
   const { token: tok } = theme.useToken();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

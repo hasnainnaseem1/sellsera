@@ -59,12 +59,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const [existingImages, setExistingImages] = useState([]);
   const [existingVideos, setExistingVideos] = useState([]);
   const [existingFiles, setExistingFiles] = useState([]);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [videoUploading, setVideoUploading] = useState(false);
-  const [fileUploading, setFileUploading] = useState(false);
-  const [deletingImageId, setDeletingImageId] = useState(null);
-  const [deletingVideoId, setDeletingVideoId] = useState(null);
-  const [deletingFileId, setDeletingFileId] = useState(null);
+
   const imageInputRef = useRef(null);
   const replaceInputRef = useRef(null);
   const videoInputRef = useRef(null);
