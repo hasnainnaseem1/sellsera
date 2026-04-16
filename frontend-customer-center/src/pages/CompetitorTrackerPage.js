@@ -182,9 +182,8 @@ const CompetitorTrackerPage = () => {
     setListingsData([]);
     setListingsLoading(true);
     try {
-      const res = await etsyApi.getSnapshots(record._id, { limit: 1 });
-      const latest = res.data?.snapshots?.[0];
-      setListingsData(latest?.topListings || []);
+      const res = await etsyApi.getCompetitorDetail(record._id);
+      setListingsData(res.data?.topListings || []);
     } catch { setListingsData([]); }
     finally { setListingsLoading(false); }
   };
@@ -653,7 +652,7 @@ const CompetitorTrackerPage = () => {
                 ) : (
                   <>
                     <Text strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-                      Top Listings ({Math.min(listingsData.length, listingLimit)} of {listingsData.length} captured)
+                      Top Listings ({Math.min(listingsData.length, listingLimit)} of {listingsData.length} available)
                     </Text>
                     <Table
                       dataSource={listingsData.slice(0, listingLimit).map((l, i) => ({ key: i, ...l }))}
@@ -671,8 +670,8 @@ const CompetitorTrackerPage = () => {
                           style={{ borderColor: colors.brand, color: colors.brand, fontWeight: 600 }}
                         >
                           {hasDetailAccess
-                            ? `Load All ${listingsData.length} Listings`
-                            : 'Unlock All Listings — Upgrade to Pro Plus'}
+                            ? `View All ${listingsData.length} Listings`
+                            : `Unlock All ${listingsData.length} Listings — Upgrade to Pro Plus`}
                         </Button>
                       </div>
                     )}

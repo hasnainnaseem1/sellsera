@@ -576,7 +576,7 @@ const getCompetitorDetail = async (req, res) => {
       _id: req.params.id,
       userId: req.userId,
       shopId: req.etsyShop._id,
-    }).lean();
+    });
 
     if (!watch) {
       return res.status(404).json({ success: false, message: 'Competitor not found' });
@@ -585,6 +585,20 @@ const getCompetitorDetail = async (req, res) => {
     const latestSnapshot = await CompetitorSnapshot.findOne({ watchId: watch._id })
       .sort({ capturedAt: -1 })
       .lean();
+
+    let topListings = latestSnapshot?.topListings || [];
+
+    // If snapshot has fewer than 50 listings, do a live fetch to backfill
+    if (topListings.length < 50) {
+      const { shopData } = await fetchShopData(watch.etsyShopId || watch.shopName);
+      if (shopData && shopData.topListings && shopData.topListings.length > topListings.length) {
+        topListings = shopData.topListings;
+        // Update snapshot so future reads are fast
+        if (latestSnapshot) {
+          await CompetitorSnapshot.findByIdAndUpdate(latestSnapshot._id, { topListings });
+        }
+      }
+    }
 
     return res.json({
       success: true,
@@ -598,7 +612,7 @@ const getCompetitorDetail = async (req, res) => {
         avgPrice: watch.latestSnapshot?.avgPrice || 0,
         iconUrl: watch.iconUrl || '',
         shopCountry: watch.shopCountry || '',
-        topListings: latestSnapshot?.topListings || [],
+        topListings,
       },
     });
   } catch (error) {
