@@ -31,11 +31,11 @@ const run = async () => {
       const listingsRes = await etsyApi.publicRequest(
         'GET',
         `/v3/application/shops/${watch.etsyShopId}/listings/active`,
-        { params: { limit: 25, sort_on: 'score' } }
+        { params: { limit: 50, sort_on: 'score' } }
       );
 
       const topListings = (listingsRes.success && listingsRes.data?.results)
-        ? listingsRes.data.results.slice(0, 10).map(l => ({
+        ? listingsRes.data.results.map(l => ({
             listingId: String(l.listing_id),
             title: l.title,
             price: l.price?.amount ? l.price.amount / l.price.divisor : 0,
