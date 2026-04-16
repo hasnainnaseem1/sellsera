@@ -609,37 +609,45 @@ const CompetitorTrackerPage = () => {
           width={900}
           destroyOnClose
           title={null}
-          closable
+          closable={false}
           styles={{ body: { padding: 0 }, header: { display: 'none' } }}
         >
           {listingsModal.record && (
             <>
               <div style={{
-                background: `linear-gradient(135deg, ${colors.brand}, ${colors.brandLight || '#8B83FF'})`,
+                position: 'relative',
+                background: tok.colorBgElevated,
+                borderBottom: `2px solid ${colors.brand}`,
                 padding: '20px 24px',
                 borderRadius: '8px 8px 0 0',
-                color: '#fff',
               }}>
-                <Space size={16} align="start">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<span style={{ fontSize: 16, color: tok.colorTextSecondary }}>&times;</span>}
+                  onClick={() => setListingsModal({ open: false, record: null })}
+                  style={{ position: 'absolute', top: 12, right: 12, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                />
+                <Space size={14} align="center">
                   <Avatar
                     src={listingsModal.record.iconUrl || undefined}
                     icon={!listingsModal.record.iconUrl && <ShopOutlined />}
-                    size={48}
-                    style={{ background: 'rgba(255,255,255,0.2)', border: '2px solid rgba(255,255,255,0.3)' }}
+                    size={44}
+                    style={{ background: colors.brand, border: `2px solid ${colors.brand}` }}
                   />
                   <div>
-                    <Text style={{ color: '#fff', fontSize: 18, fontWeight: 700, display: 'block', lineHeight: 1.3 }}>
+                    <Text style={{ fontSize: 17, fontWeight: 700, display: 'block', lineHeight: 1.3 }}>
                       {listingsModal.record.shopName}
                     </Text>
-                    <Space size={16} style={{ marginTop: 4 }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
-                        <TrophyOutlined /> {listingsModal.record.totalSales.toLocaleString()} sales
+                    <Space size={12} style={{ marginTop: 2 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        <TrophyOutlined style={{ color: colors.success }} /> {listingsModal.record.totalSales.toLocaleString()} sales
                       </Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
-                        <StarFilled /> {listingsModal.record.rating > 0 ? listingsModal.record.rating.toFixed(1) : '—'}
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        <StarFilled style={{ color: '#faad14' }} /> {listingsModal.record.rating > 0 ? listingsModal.record.rating.toFixed(1) : '—'}
                       </Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
-                        {listingsModal.record.totalListings} listings
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        <ShopOutlined style={{ color: colors.brand }} /> {listingsModal.record.totalListings.toLocaleString()} listings
                       </Text>
                     </Space>
                   </div>
