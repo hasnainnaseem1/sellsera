@@ -27,6 +27,7 @@ import BulkRankCheckerPage from './pages/BulkRankCheckerPage';
 import TagAnalyzerPage from './pages/TagAnalyzerPage';
 import ActiveListingsPage from './pages/ActiveListingsPage';
 import CompetitorSalesPage from './pages/CompetitorSalesPage';
+import CompetitorListingDetailPage from './pages/CompetitorListingDetailPage';
 import DeliveryStatusPage from './pages/DeliveryStatusPage';
 import SalesMapPage from './pages/SalesMapPage';
 import UsageQuotasPage from './pages/UsageQuotasPage';
@@ -133,6 +134,7 @@ const AppWithTheme = () => {
           <Route path="/keywords/tags" element={<ProtectedRoute><TagAnalyzerPage /></ProtectedRoute>} />
           <Route path="/competitors"  element={<ProtectedRoute><CompetitorTrackerPage /></ProtectedRoute>} />
           <Route path="/competitors/sales" element={<ProtectedRoute><CompetitorSalesPage /></ProtectedRoute>} />
+          <Route path="/competitors/:watchId/listings/:listingId" element={<ProtectedRoute><CompetitorListingDetailPage /></ProtectedRoute>} />
           <Route path="/listings/active" element={<ProtectedRoute><ActiveListingsPage /></ProtectedRoute>} />
           <Route path="/delivery"     element={<ProtectedRoute><DeliveryStatusPage /></ProtectedRoute>} />
           <Route path="/sales-map"    element={<ProtectedRoute><SalesMapPage /></ProtectedRoute>} />

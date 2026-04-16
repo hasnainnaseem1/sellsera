@@ -77,12 +77,12 @@ async function fetchShopData(shopNameOrId) {
   const listingsResult = await etsyApi.publicRequest(
     'GET',
     `/v3/application/shops/${shop.shop_id}/listings/active`,
-    { params: { limit: 25, sort_on: 'score' } }
+    { params: { limit: 50, sort_on: 'score' } }
   );
   serpCalls++;
 
   const allListings = listingsResult.success ? (listingsResult.data.results || []) : [];
-  const topListings = allListings.slice(0, 10).map(l => ({
+  const topListings = allListings.map(l => ({
     listingId: String(l.listing_id),
     title: l.title || '',
     price: l.price?.amount ? l.price.amount / l.price.divisor : 0,
@@ -568,6 +568,45 @@ const refreshAll = async (req, res) => {
   }
 };
 
+/* ─── GET /:id/detail ─── */
+
+const getCompetitorDetail = async (req, res) => {
+  try {
+    const watch = await CompetitorWatch.findOne({
+      _id: req.params.id,
+      userId: req.userId,
+      shopId: req.etsyShop._id,
+    }).lean();
+
+    if (!watch) {
+      return res.status(404).json({ success: false, message: 'Competitor not found' });
+    }
+
+    const latestSnapshot = await CompetitorSnapshot.findOne({ watchId: watch._id })
+      .sort({ capturedAt: -1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      data: {
+        shopName: watch.shopName,
+        etsyShopId: watch.etsyShopId,
+        totalSales: watch.latestSnapshot?.totalSales || 0,
+        totalListings: watch.latestSnapshot?.totalListings || 0,
+        rating: watch.latestSnapshot?.rating || 0,
+        reviewCount: watch.latestSnapshot?.reviewCount || 0,
+        avgPrice: watch.latestSnapshot?.avgPrice || 0,
+        iconUrl: watch.iconUrl || '',
+        shopCountry: watch.shopCountry || '',
+        topListings: latestSnapshot?.topListings || [],
+      },
+    });
+  } catch (error) {
+    log.error('Competitor detail error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve competitor detail' });
+  }
+};
+
 module.exports = {
   addCompetitor,
   removeCompetitor,
@@ -577,4 +616,5 @@ module.exports = {
   refreshCompetitor,
   refreshAll,
   salesOverview,
+  getCompetitorDetail,
 };

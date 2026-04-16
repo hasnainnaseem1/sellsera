@@ -54,6 +54,16 @@ router.get('/sales/overview',
   competitorController.salesOverview
 );
 
+// @route   GET /api/v1/customer/competitors/:id/detail
+// @desc    Get full competitor detail with all listings (Pro Plus)
+// @access  Private — needs subscription + Etsy shop + competitor_detail_access
+router.get('/:id/detail',
+  checkSubscription,
+  checkShopConnection,
+  checkFeatureAccess('competitor_detail_access'),
+  competitorController.getCompetitorDetail
+);
+
 // @route   GET /api/v1/customer/competitors/:id/snapshots
 // @desc    Get snapshot history for a specific competitor
 // @access  Private — needs Etsy shop connection

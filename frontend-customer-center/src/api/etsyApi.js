@@ -125,6 +125,7 @@ const etsyApi = {
   refreshCompetitor:       (id) => axiosInstance.post(`/api/v1/customer/competitors/${id}/refresh`).then(r => r.data),
   refreshAllCompetitors:   () => axiosInstance.post('/api/v1/customer/competitors/refresh-all').then(r => r.data),
   getSalesOverview:        () => axiosInstance.get('/api/v1/customer/competitors/sales/overview').then(r => r.data),
+  getCompetitorDetail:     (id) => axiosInstance.get(`/api/v1/customer/competitors/${id}/detail`).then(r => r.data),
 
   // Logistics
   getDeliveryStatus:  (params = {}) => axiosInstance.get('/api/v1/customer/logistics/delivery-status', { params }).then(r => r.data),

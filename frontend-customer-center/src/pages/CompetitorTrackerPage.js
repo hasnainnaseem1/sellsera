@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Input, Button, Table, Tag, Typography, Row, Col, Avatar,
-  Space, Empty, Statistic, message, theme, Tooltip, Badge, Popconfirm,
+  Space, Empty, Statistic, message, theme, Tooltip, Badge, Popconfirm, Modal, Spin,
 } from 'antd';
 import {
   PlusOutlined, ShopOutlined, TrophyOutlined, StarFilled,
   RiseOutlined, FallOutlined, DeleteOutlined, TeamOutlined,
   ReloadOutlined, DollarOutlined, LinkOutlined, HeartOutlined,
-  EyeOutlined, TagOutlined,
+  EyeOutlined, TagOutlined, CrownOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import AppLayout from '../components/AppLayout';
@@ -27,8 +28,9 @@ const { Title, Text } = Typography;
 const CompetitorTrackerPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, incrementUsage } = usePermissions();
+  const { getFeatureAccess, incrementUsage, plan } = usePermissions();
   const access = getFeatureAccess('competitor_tracking');
+  const navigate = useNavigate();
 
   const [shopUrl, setShopUrl] = useState('');
   const [shops, setShops] = useState([]);
@@ -155,11 +157,26 @@ const CompetitorTrackerPage = () => {
     ? Math.round(shops.reduce((s, r) => s + r.avgPrice, 0) / shops.length * 100) / 100
     : 0;
 
-  /* ─── Expandable row – top listings ─── */
+  /* ─── Expandable row – top listings (plan-gated) ─── */
 
   const ExpandedRow = ({ record }) => {
     const [snaps, setSnaps] = useState([]);
     const [snapLoading, setSnapLoading] = useState(true);
+    const [expandedTags, setExpandedTags] = useState(new Set());
+    const [loadMoreOpen, setLoadMoreOpen] = useState(false);
+    const [allListings, setAllListings] = useState([]);
+    const [allListingsLoading, setAllListingsLoading] = useState(false);
+
+    // Feature access
+    const listingAccess = getFeatureAccess('competitor_listing_limit');
+    const tagAccess = getFeatureAccess('competitor_tag_limit');
+    const detailAccess = getFeatureAccess('competitor_detail_access');
+
+    const listingLimit = (listingAccess.state === 'unlocked' && listingAccess.limit) ? listingAccess.limit : 10;
+    const tagLimit = (tagAccess.state === 'unlocked' && tagAccess.limit) ? tagAccess.limit : 5;
+    const tagUnlimited = tagAccess.state === 'unlocked' && (tagAccess.unlimited || !tagAccess.limit);
+    const hasDetailAccess = detailAccess.state === 'unlocked';
+    const isPro = listingLimit > 10 && !tagUnlimited; // Pro = 15 listings but 5 tags
 
     useEffect(() => {
       (async () => {
@@ -172,16 +189,123 @@ const CompetitorTrackerPage = () => {
       })();
     }, [record._id]);
 
+    const toggleTagExpand = (key) => {
+      setExpandedTags(prev => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+      });
+    };
+
+    const handleLoadMore = async () => {
+      if (!hasDetailAccess) {
+        Modal.info({
+          title: 'Upgrade to Pro Plus',
+          icon: <CrownOutlined style={{ color: colors.brand }} />,
+          content: (
+            <div>
+              <Text style={{ display: 'block', marginBottom: 12 }}>
+                Access all competitor listings with detailed insights on the Pro Plus plan.
+              </Text>
+              <Text type="secondary">
+                Current Plan: <Tag color={colors.brand}>{plan.name}</Tag>
+              </Text>
+            </div>
+          ),
+          okText: 'Upgrade Plan',
+          onOk: () => navigate('/settings?tab=plans'),
+        });
+        return;
+      }
+      // Pro Plus — open modal with all listings
+      setLoadMoreOpen(true);
+      if (allListings.length === 0) {
+        setAllListingsLoading(true);
+        try {
+          const res = await etsyApi.getCompetitorDetail(record._id);
+          setAllListings(res.data?.topListings || []);
+        } catch { message.error('Failed to load all listings'); }
+        finally { setAllListingsLoading(false); }
+      }
+    };
+
     if (snapLoading) return <Text type="secondary">Loading top listings...</Text>;
     if (!snaps.length) return <Text type="secondary">No listing data captured yet.</Text>;
+
+    const displayedListings = snaps.slice(0, listingLimit);
+
+    const renderTags = (tags, rowKey) => {
+      const allTags = tags || [];
+      if (tagUnlimited) {
+        // Pro Plus — show all tags
+        return (
+          <Space size={2} wrap>
+            {allTags.map((t, i) => (
+              <Tag key={i} style={{ fontSize: 10, margin: 0, lineHeight: '18px' }}>{t}</Tag>
+            ))}
+          </Space>
+        );
+      }
+      const visible = allTags.slice(0, tagLimit);
+      const remaining = allTags.slice(tagLimit);
+      const isExpanded = expandedTags.has(rowKey);
+      return (
+        <Space size={2} wrap>
+          {visible.map((t, i) => (
+            <Tag key={i} style={{ fontSize: 10, margin: 0, lineHeight: '18px' }}>{t}</Tag>
+          ))}
+          {isExpanded && remaining.map((t, i) => (
+            <Tag key={`r-${i}`} style={{ fontSize: 10, margin: 0, lineHeight: '18px' }}>{t}</Tag>
+          ))}
+          {remaining.length > 0 && !isExpanded && (
+            <Tag
+              style={{ fontSize: 10, margin: 0, lineHeight: '18px', cursor: 'pointer', color: colors.brand, borderColor: colors.brand }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isPro) {
+                  toggleTagExpand(rowKey);
+                } else {
+                  Modal.info({
+                    title: 'Upgrade to Pro',
+                    icon: <CrownOutlined style={{ color: colors.brand }} />,
+                    content: (
+                      <div>
+                        <Text style={{ display: 'block', marginBottom: 12 }}>
+                          Expand all tags on competitor listings with the Pro plan.
+                        </Text>
+                        <Text type="secondary">
+                          Current Plan: <Tag color={colors.brand}>{plan.name}</Tag>
+                        </Text>
+                      </div>
+                    ),
+                    okText: 'Upgrade Plan',
+                    onOk: () => navigate('/settings?tab=plans'),
+                  });
+                }
+              }}
+            >
+              +{remaining.length}
+            </Tag>
+          )}
+          {isExpanded && (
+            <Tag
+              style={{ fontSize: 10, margin: 0, lineHeight: '18px', cursor: 'pointer', color: colors.brand, borderColor: colors.brand }}
+              onClick={(e) => { e.stopPropagation(); toggleTagExpand(rowKey); }}
+            >
+              Show less
+            </Tag>
+          )}
+        </Space>
+      );
+    };
 
     return (
       <div style={{ padding: '8px 0' }}>
         <Text strong style={{ marginBottom: 8, display: 'block', fontSize: 13 }}>
-          Top Listings ({snaps.length})
+          Top Listings ({displayedListings.length}{snaps.length > listingLimit ? ` of ${snaps.length}` : ''})
         </Text>
         <Table
-          dataSource={snaps.map((l, i) => ({ key: i, ...l }))}
+          dataSource={displayedListings.map((l, i) => ({ key: i, ...l }))}
           pagination={false}
           size="small"
           columns={[
@@ -190,7 +314,19 @@ const CompetitorTrackerPage = () => {
               dataIndex: 'title',
               key: 'title',
               ellipsis: true,
-              render: (t, r) => (
+              render: (t, r) => hasDetailAccess ? (
+                <a
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/competitors/${record._id}/listings/${r.listingId}`, {
+                      state: { listing: r, shopName: record.shopName },
+                    });
+                  }}
+                  style={{ color: colors.brand, fontSize: 12, cursor: 'pointer' }}
+                >
+                  {t} <ArrowRightOutlined style={{ fontSize: 9, opacity: 0.6 }} />
+                </a>
+              ) : (
                 <a
                   href={`https://www.etsy.com/listing/${r.listingId}`}
                   target="_blank" rel="noopener noreferrer"
@@ -229,19 +365,101 @@ const CompetitorTrackerPage = () => {
               dataIndex: 'tags',
               key: 'tags',
               width: 200,
-              render: tags => (
-                <Space size={2} wrap>
-                  {(tags || []).slice(0, 5).map((t, i) => (
-                    <Tag key={i} style={{ fontSize: 10, margin: 0, lineHeight: '18px' }}>{t}</Tag>
-                  ))}
-                  {(tags || []).length > 5 && (
-                    <Tag style={{ fontSize: 10, margin: 0, lineHeight: '18px' }}>+{tags.length - 5}</Tag>
-                  )}
-                </Space>
-              ),
+              render: (tags, _, idx) => renderTags(tags, idx),
             },
           ]}
         />
+        {snaps.length > listingLimit && (
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <Button
+              type="link"
+              icon={hasDetailAccess ? <ArrowRightOutlined /> : <CrownOutlined />}
+              onClick={handleLoadMore}
+              style={{ color: colors.brand, fontWeight: 600, fontSize: 13 }}
+            >
+              {hasDetailAccess ? `View All ${snaps.length} Listings` : 'Load More Listings'}
+            </Button>
+          </div>
+        )}
+
+        {/* Pro Plus — All Listings Modal */}
+        <Modal
+          title={`All Listings — ${record.shopName}`}
+          open={loadMoreOpen}
+          onCancel={() => setLoadMoreOpen(false)}
+          footer={null}
+          width={800}
+          destroyOnClose
+        >
+          {allListingsLoading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+          ) : (
+            <Table
+              dataSource={allListings.map((l, i) => ({ key: i, ...l }))}
+              pagination={allListings.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
+              size="small"
+              scroll={{ y: 500 }}
+              columns={[
+                {
+                  title: 'Title',
+                  dataIndex: 'title',
+                  key: 'title',
+                  ellipsis: true,
+                  render: (t, r) => (
+                    <a
+                      onClick={() => {
+                        setLoadMoreOpen(false);
+                        navigate(`/competitors/${record._id}/listings/${r.listingId}`, {
+                          state: { listing: r, shopName: record.shopName },
+                        });
+                      }}
+                      style={{ color: colors.brand, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      {t} <ArrowRightOutlined style={{ fontSize: 9, opacity: 0.6 }} />
+                    </a>
+                  ),
+                },
+                {
+                  title: 'Price',
+                  dataIndex: 'price',
+                  key: 'price',
+                  width: 80,
+                  align: 'right',
+                  render: v => <Text style={{ fontSize: 12 }}>${v?.toFixed(2)}</Text>,
+                },
+                {
+                  title: <><EyeOutlined /> Views</>,
+                  dataIndex: 'views',
+                  key: 'views',
+                  width: 80,
+                  align: 'center',
+                  render: v => <Text style={{ fontSize: 12 }}>{(v || 0).toLocaleString()}</Text>,
+                },
+                {
+                  title: <><HeartOutlined /> Faves</>,
+                  dataIndex: 'favorites',
+                  key: 'favorites',
+                  width: 80,
+                  align: 'center',
+                  render: v => <Text style={{ fontSize: 12 }}>{(v || 0).toLocaleString()}</Text>,
+                },
+                {
+                  title: <><TagOutlined /> Tags</>,
+                  dataIndex: 'tags',
+                  key: 'tags',
+                  width: 200,
+                  render: tags => (
+                    <Space size={2} wrap>
+                      {(tags || []).map((t, i) => (
+                        <Tag key={i} style={{ fontSize: 10, margin: 0, lineHeight: '18px' }}>{t}</Tag>
+                      ))}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+          )}
+        </Modal>
       </div>
     );
   };
